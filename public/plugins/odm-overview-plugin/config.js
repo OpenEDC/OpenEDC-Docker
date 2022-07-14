@@ -1,0 +1,1 @@
+export const UMLS_SERVER_URL = 'https://mdm.mi.uni-heidelberg.de/umls/getCUI';

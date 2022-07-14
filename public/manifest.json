@@ -1,0 +1,21 @@
+{
+    "name": "OpenEDC",
+    "short_name": "OpenEDC",
+    "scope": ".",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#FFFFFF",
+    "theme_color": "#FFFFFF",
+    "icons": [
+        {
+            "src": "img/android-chrome-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "img/android-chrome-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

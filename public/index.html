@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html class="is-unselectable has-navbar-fixed-top">
+    <head>
+        <title>OpenEDC – Start</title>
+        <meta charset="UTF-8">
+        <meta name="description" content="Free and open-source electronic data capture (EDC) system for medical research that is based on the CDISC ODM-XML standard.">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+        <meta name="theme-color" content="#ffffff">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <link rel="icon" href="./favicon.ico" type="image/x-icon">
+        <link rel="apple-touch-icon" sizes="180x180" href="./img/apple-touch-icon.png">
+        <link rel="stylesheet" type="text/css" href="./lib/bulma.css">
+        <link rel="stylesheet" type="text/css" href="./lib/bulma.min.css">
+        <link rel="stylesheet" type="text/css" href="./lib/fontawesome.css">
+        <link rel="stylesheet" type="text/css" href="./lib/print.min.css">
+        <link rel="stylesheet" type="text/css" href="./css/style.css">
+        
+        <script src="./js/helper/prototypefunctions.js"></script>
+        <script src="./js/components/navigationbar.js"></script>
+        <script src="./js/components/metadatasection.js"></script>
+        <script src="./js/components/clinicaldatasection.js"></script>
+        <script src="./js/components/reportssection.js"></script>
+        <script src="./js/components/projectmodal.js"></script>
+        <script src="./js/components/exportmodal.js"></script>
+        <script src="./js/components/othermodals.js"></script>
+        <script src="./js/components/datetimepicker.js"></script>
+        <script type="text/javascript" src="./lib/filesaver.min.js" ></script>
+        
+        <script src="./js/app.js" type="module"></script>
+    </head>
+    <body>
+        <navigation-bar></navigation-bar>
+
+        <metadata-section></metadata-section>
+        <clinicaldata-section></clinicaldata-section>
+        <reports-section></reports-section>
+
+        <start-modal></start-modal>
+        <login-modal></login-modal>
+    </body>
+</html>

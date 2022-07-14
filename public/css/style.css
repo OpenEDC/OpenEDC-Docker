@@ -1,0 +1,710 @@
+:root {
+    --link-color: #3273dc;
+    --link-hover-color: #276cda;
+    --link-active-color: #3a51bb;
+    --link-light-color: #eef3fc;
+    --link-light-hover-color: #e3ecfa;
+    --link-light-active-color: #d8e4f8;
+    --gray-color: #b5b5b5;
+    --gray-light-color: #d6d6d6;
+    --gray-lighter-color: #ededed;
+    --gray-lightest-color: #f5f5f5;
+    --dark-color: #363636;
+}
+
+html {
+    overflow-y: auto;
+}
+
+html, body {
+    touch-action: manipulation;
+}
+
+.navbar-brand, .navbar-brand .navbar-item {
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.navbar-brand {
+    padding-bottom: 1px;
+}
+
+.navbar-start {
+    padding-top: 1px;
+}
+
+#study-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: normal;
+    font-weight: 500;
+}
+
+#language-dropdown {
+    border-radius: 6px;
+    border-top: none;
+    top: calc(100% - 4px);
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.has-border-shadow {
+    box-shadow: 0 8px 8px rgba(10, 10, 10, .1), 0 0 0 1px rgba(10, 10, 10, .1);
+}
+
+.navbar-item .dropdown-menu {
+    top: calc(100% - 4px);
+}
+
+.navbar-burger {
+    min-width: 3.25rem;
+}
+
+.navbar-burger:hover {
+    background-color: transparent;
+}
+
+.openedc-title {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section {
+    padding: 1.75rem 1.25rem;
+}
+
+a.panel-block {
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+.notification:not(.is-toast) {
+    padding: 1.25rem 1.5rem;
+}
+
+.notification.is-toast {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 50;
+    margin: 1.5rem;
+    max-width: 20rem;
+    opacity: 0;
+    transition: opacity .5s;
+}
+
+.sidebar {
+    border-radius: 6px 0 0 6px;
+    color: var(--link-color);
+    background-color: var(--link-light-color);
+}
+
+.sidebar-options {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: .5rem 0 .5rem 0;
+    overflow-x: hidden;
+    max-width: 3rem;
+    transition: max-width .5s 1.25s;
+}
+
+.sidebar:hover .sidebar-options {
+    max-width: 10rem;
+}
+
+.sidebar-option {
+    display: flex;
+    align-items: center;
+    height: 3rem;
+}
+
+.sidebar-option:hover {
+    background-color: var(--link-light-hover-color);
+    cursor: pointer;
+}
+
+.sidebar-option.is-active {
+    background-color: var(--link-light-active-color);
+}
+
+.sidebar-option:not(.is-activable):not(.is-highlighted) {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.sidebar-option:nth-last-child(2) {
+    margin-top: auto;
+}
+
+.sidebar-option i {
+    text-align: center;
+    min-width: 3rem;
+    pointer-events: none;
+}
+
+.sidebar-option i:before {
+    vertical-align: middle;
+}
+
+.sidebar-option span {
+    margin-right: 1.25rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .5s 1.25s;
+}
+
+.sidebar:hover .sidebar-option span {
+    opacity: 1;
+}
+
+.box.has-sidebar {
+    display: flex;
+    padding: 0;
+    height: 280px;
+}
+
+.box.has-sidebar .box-content {
+    flex-grow: 1;
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+}
+
+#translation-textarea {
+    min-height: 5rem;
+}
+
+#extended-options-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: .5rem;
+}
+
+#clinicaldata-form-title, #clinicaldata-form-title .level-item {
+    flex-shrink: 1;
+}
+
+#clinicaldata-form-data {
+    padding: 20px;
+}
+
+#no-subjects-hint {
+    padding: 40px;
+}
+
+#no-users-hint, #no-sites-hint {
+    padding: 30px;
+}
+
+.has-no-padding-bottom {
+    padding-bottom: 0px !important;
+}
+
+.has-no-border-bottom {
+    border-bottom: none !important;
+}
+
+.has-no-border-left {
+    border-left: none !important;
+}
+
+hr {
+    margin-top: 0px;
+    margin-bottom: 20px;
+}
+
+.panel-heading {
+    font-weight: bold;
+}
+
+a.panel-block:hover {
+    background-color: transparent;
+}
+
+.panel-block.is-active {
+    background-color: var(--gray-lightest-color) !important;
+    border-left: 2px var(--link-color) solid;
+}
+
+.panel-block.has-text-centered p {
+    margin: 0 auto;
+}
+
+.panel-icon, .panel-block-content, .panel-block-title, .panel-block-subtitle {
+    pointer-events: none;
+}
+
+.panel-block-subtitle {
+    font-size: 12px;
+    color: gray;
+}
+
+.modal-content.is-large {
+    max-width: 800px;
+}
+
+.modal-content.is-medium {
+    max-width: 600px;
+}
+
+.modal-content.is-small {
+    max-width: 400px;
+}
+
+.modal-content .is-close-button {
+    position: fixed;
+    transform: translateX(-150%) translateY(-50%);
+    border: 2px solid white;
+    background-color: black;
+    z-index: 5;
+}
+
+.modal-content {
+    max-height: calc(100vh - 120px);
+}
+
+.modal-background {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.input {
+    min-width: 50px;
+}
+
+.tree-panel-blocks {
+    overflow-y: auto;
+}
+
+.tree-panel-blocks .panel-block {
+    border-radius: 0px;
+}
+
+.has-light-border-top {
+    border-top: 1px solid var(--gray-lighter-color);
+}
+
+.item-field {
+    margin-bottom: 20px;
+}
+
+.item-field label {
+    white-space: pre-line;
+}
+
+.item-field .icon.is-history-button {
+    padding-top: 1px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .5s .5s;
+}
+
+.item-field:hover .icon.is-history-button {
+    opacity: 1;
+}
+
+.item-field .icon.is-history-button i {
+    pointer-events: none;
+}
+
+#clinicaldata-content .subtitle {
+    white-space: pre-line;
+}
+
+.field.is-fullwidth, .control.is-fullwidth {
+    display: flex;
+    width: 100%;
+}
+
+.field label.radio:not(:last-child), .field label.checkbox:not(:last-child) {
+    margin-bottom: 5px;
+}
+
+.input[disabled], .select select[disabled], .textarea[disabled], .input[readonly] {
+    color: #4a4a4a;
+    background-color: #f5f5f5;
+}
+
+.message {
+    margin-bottom: 20px;
+}
+
+.file-cta {
+    background-color: #fff;
+    color: var(--dark-color);
+}
+
+.file-label:hover .file-cta {
+    background-color: #fff !important;
+    border-color: var(--gray-color);
+}
+
+.file-label:hover .file-cta.is-link {
+    background-color: var(--link-hover-color) !important;
+    border-color: transparent;
+    color: #fff;
+}
+
+.is-survey-view {
+    max-width: 600px;
+    margin: 0 auto;
+    overflow-y: visible;
+    max-height: none !important;
+}
+
+.is-survey-view .is-hidden-survey-view {
+    display: none;
+}
+
+.item-field.is-highlighted {
+    padding: 6px;
+    border-radius: 6px;
+    background-color: lightsalmon;
+}
+
+.level-left.is-centered {
+    margin: 0 auto;
+}
+
+#audit-records {
+    margin-bottom: 1rem;
+}
+
+#mobile-back-button {
+    padding-bottom: 6px;
+}
+
+.width-is-three-quarters {
+    width: 75%;
+    margin: 0 auto;
+}
+
+.width-is-two-thirds {
+    width: 66%;
+    margin: 0 auto;
+}
+
+.numpad {
+    max-width: 250px;
+    margin: 0 auto;
+}
+
+.button.is-large.is-rounded {
+    width: 0px;
+}
+
+#form-validate-button:not(.is-validated) .icon {
+    display: none;
+}
+
+#barcode-video-stream canvas {
+    display: none;
+}
+
+.field.is-grouped .control:not(:last-child) {
+    margin-right: 0.5rem;
+}
+
+.autocomplete-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-x: auto;
+    box-shadow: 0px 0px 10px 5px var(--gray-light-color);
+    background-color: white;
+}
+
+.control.has-autocomplete-top .autocomplete-list {
+    bottom: 120%;
+}
+
+.control.has-autocomplete-bottom .autocomplete-list {
+    top: 120%;
+}
+
+.autocomplete-option {
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+.autocomplete-option:not(:last-child) {
+    border-bottom: 1px solid var(--gray-light-color);
+}
+  
+.autocomplete-option:hover {
+    background-color: var(--gray-lightest-color);
+}
+
+.autocomplete-container {
+    position: relative;
+    width: 150%;
+}
+
+.text-divider {
+    display: flex;
+    align-items: center;
+}
+
+.text-divider::before, .text-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--gray-light-color);
+}
+
+.text-divider::before {
+    margin-right: 15px;
+}
+
+.text-divider::after {
+    margin-left: 15px;
+}
+
+#widgets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    grid-auto-rows: 18rem;
+    grid-auto-flow: dense;
+    grid-gap: 1.5rem;
+    perspective: 1500px;
+}
+
+.widget {
+    border-radius: 6px;
+    box-shadow: 0 0.5em 1em -0.125em rgb(10 10 10 / 10%), 0 0 0 1px rgb(10 10 10 / 2%);
+    transition: transform .75s;
+    transform-style: preserve-3d;
+}
+
+.widget.is-medium {
+    grid-column-end: span 2;
+}
+
+.widget.is-large {
+    grid-column-end: span 2;
+    grid-row-end: span 2;
+}
+
+.widget.is-flipped {
+    transform: rotateY(180deg);
+}
+
+.widget-content, .widget-options {
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    transform: rotateY(0deg);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.widget-options {
+    transform: rotateY(180deg);
+}
+
+.widget:not(.is-placeholder) .icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 1.25rem 1.5rem 2.5rem 2.5rem;
+    opacity: 0;
+    transition: opacity .5s;
+}
+
+.widget.is-flipped .icon {
+    display: none;
+}
+
+.widget:not(.is-placeholder) .icon:hover {
+    opacity: 1;
+}
+
+.widget.is-placeholder {
+    border: 2px dashed lightgray;
+    color: lightgray;
+    transition: color .5s;
+}
+
+.widget.is-placeholder:hover {
+    color: gray;
+}
+
+.grid-even-columns {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 5px;
+}
+
+.has-overvlow-wrap  {
+    word-break: break-all;
+}
+
+.has-text-align-center {
+    text-align: center;
+}
+
+[contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.mobile-span {
+    display: none;
+}
+
+div.has-hover {
+    color: var(--link-color);
+}
+
+div.has-hover:hover {
+    transform: scale(1.2);
+}
+
+div.has-hover:active {
+    box-shadow: 0 1px var(--link-active-color);
+    transform: translateY(1px);
+}
+
+.container___menu {
+    position: absolute;
+    width: 400px;
+    list-style-type: none;
+    margin: 0px !important;
+    padding: 5px;
+    border: 2px solid var(--link-color);
+    border-radius: 0.25rem;
+    background-color: white;
+    z-index: 50;
+}
+
+.container___menu:after, .container___menu:before {
+	bottom: 100%;
+	left: 25px;
+	border: solid transparent;
+	content: " ";
+	height: 0;
+	width: 0;
+	position: absolute;
+	pointer-events: none;
+}
+
+.container___menu:after {
+	
+	border-bottom-color: white;
+	border-width: 14px;
+	margin-left: -14px;
+}
+.container___menu:before {
+	
+	border-bottom: 2px solid var(--link-color);
+	border-width: 16px;
+	margin-left: -16px;
+}
+
+.container__menu--hidden {
+    display: none;
+}
+
+.no-bullets {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+.div-underline {
+    border-bottom: 1px solid var(--link-color);
+}
+
+.notification-close:hover {
+    background-color: var(--link-light-hover-color);
+}
+
+/* Define what each icon button should look like */
+.button-with-badge {
+    color: white;
+    display: inline-block; /* Inline elements with width and height. TL;DR they make the icon buttons stack from left-to-right instead of top-to-bottom */
+    position: relative; /* All 'absolute'ly positioned elements are relative to this one */
+    padding: 2px 5px; /* Add some padding so it looks nice */
+  }
+
+.button-badge {
+    background-color: #fa3e3e;
+    border-radius: 50%;
+    color: white;
+   
+    padding: 0px 4px;
+    font-size: 8px;
+    
+    position: absolute; /* Position the badge within the relatively positioned button */
+    top: 0;
+    right: 0;
+  }
+
+@media only screen and (max-width: 1024px) {
+    #app-mode-button .dropdown-menu {
+        top: auto;
+        left: 0;
+        bottom: 100%;
+        padding-bottom: 4px;
+    }
+}
+
+@media only screen and (max-width: 768px) {
+    #language-dropdown {
+        box-shadow: none;
+    }
+
+    .modal-content.is-fullheight-mobile {
+        max-height: none;
+    }
+
+    .width-is-three-quarters, .width-is-two-thirds {
+        width: 80%;
+    }
+
+    #clinicaldata-form-title {
+        text-align: center;
+    }
+
+    #survey-view-button {
+        margin-left: 0px !important;
+    }
+
+    .box.has-sidebar {
+        height: auto;
+    }
+
+    .sidebar:hover .sidebar-options {
+        max-width: 3rem;
+    }
+
+    .sidebar:hover .sidebar-option span {
+        opacity: 0;
+    }
+
+    .widget.is-medium, .widget.is-large {
+        grid-column-end: unset;
+    }
+
+    .mobile-span {
+        display: block;
+        word-break: break-all;
+    }
+
+    .is-mobile-hidden {
+        display: none;;
+    }
+}
+
+@media only screen and (max-width: 640px) {
+    .width-is-three-quarters, .width-is-two-thirds {
+        width: 100%;
+    }
+}

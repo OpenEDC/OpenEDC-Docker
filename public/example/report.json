@@ -1,0 +1,69 @@
+{
+    "id": 1,
+    "name": "new-report",
+    "widgets": [
+        {
+            "id": 1,
+            "name": "year-of-inclusion",
+            "_type": "bar-chart",
+            "_itemPaths": [
+                "createdYear"
+            ],
+            "_size": "small",
+            "isStandard": true,
+            "hasDefaultName": true
+        },
+        {
+            "id": 2,
+            "name": "month-of-inclusion",
+            "_type": "bar-chart",
+            "_itemPaths": [
+                "createdMonth"
+            ],
+            "_size": "medium",
+            "isStandard": true,
+            "hasDefaultName": true
+        },
+        {
+            "id": 3,
+            "name": "SE.1-F.1-IG.1-Age",
+            "_itemPaths": [
+                "SE.1-F.1-IG.1-Age"
+            ],
+            "_size": "small",
+            "hasDefaultName": true,
+            "_type": "scatter-chart"
+        },
+        {
+            "id": 4,
+            "name": "SE.1-F.1-IG.1-Gender",
+            "_itemPaths": [
+                "SE.1-F.1-IG.1-Gender"
+            ],
+            "_size": "small",
+            "hasDefaultName": true,
+            "_type": "bar-chart"
+        },
+        {
+            "id": 5,
+            "name": "SE.1-F.1-IG.1-Pregnant",
+            "_itemPaths": [
+                "SE.1-F.1-IG.1-Pregnant"
+            ],
+            "_size": "small",
+            "hasDefaultName": true,
+            "_type": "donut-chart"
+        },
+        {
+            "id": 6,
+            "name": "SE.1-F.1-IG.2-CountryOfBirth",
+            "_itemPaths": [
+                "SE.1-F.1-IG.2-CountryOfBirth"
+            ],
+            "_size": "medium",
+            "hasDefaultName": true,
+            "_type": "bar-chart"
+        }
+    ],
+    "hasDefaultName": true
+}
