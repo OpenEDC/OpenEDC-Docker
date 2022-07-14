@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  reverse-proxy:
+    image: nginx:latest
+    container_name: frontproxy
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - web
+    volumes:
+      - "./nginx-config/templates:/etc/nginx/templates/"
+    environment:
+      - NGINX_INSTANCE_PORT=${PORT}
+      - NGINX_INSTANCE_NAME=${NAME}
+    networks:
+      main:
+        aliases:
+          - nginx
