@@ -1,0 +1,17 @@
+[
+  {
+    "oid": "U.1",
+    "username": "admin",
+    "authenticationKey": "o0vErpZNm/wnAKQvJrQNX+muKq3Drv+wSZsL6RupEOA=",
+    "hasInitialPassword": false,
+    "encryptedDecryptionKey": "840JBVuGv8y0e20fgZ5mo6aBMgQTZhnq+1L3Ml7jMqg7n8yJt+q5rHgcYJVk6jOSBwpXQU5m9tF3VE04TufvuDmxVi3VlVURH/n4eCRT8ssJmJa7agGDdBqsMTSbPY0+yWbH5GdtI6s=",
+    "rights": [
+      "project-options",
+      "edit-metadata",
+      "manage-subjects",
+      "validate-forms",
+      "add-subject-data",
+      "allow-export-data"
+    ]
+  }
+]

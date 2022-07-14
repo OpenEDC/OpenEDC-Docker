@@ -11,7 +11,7 @@ The simplest way of hosting your own instance locally is by executing the follow
 ```
 docker-compose up
 ```
-This way an instance is hosted on port 3000 with the name "default". This instance is already pre-initialized, meaning you need credentials to login (User: Admin, Password: Abcd1234). Since it is fully hosted inside the created container so all changes to data are lost when deleting the docker container.
+This way an instance is hosted on port 3000 with the name "default". This instance is already pre-initialized, meaning you need credentials to login (User: Admin, Password: Openedctest1). Since it is fully hosted inside the created container so all changes to data are lost when deleting the docker container.
 You can access it in your browser under http://localhost:3000.
 
 ## Configure instance
