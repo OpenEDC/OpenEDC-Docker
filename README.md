@@ -7,8 +7,13 @@ As soon as Docker Desktop is installed and running, open a PowerShell in your re
 
 ## Hosting a basic server
 
-The simplest way of hosting your own instance locally is by executing the following command
+The simplest way of hosting your own instance locally is cloning this repository via 
 ```
+git clone https://github.com/OpenEDC/OpenEDC-Docker.git
+``` 
+and executing the following command within the cloned directory OpenEDC-Docker:
+```
+cd OpenEDC-Docker
 docker-compose up
 ```
 This way an instance is hosted on port 3000 with the name "default". This instance is already pre-initialized, meaning you need credentials to login (User: Admin, Password: Openedctest1). Since it is fully hosted inside the created container so all changes to data are lost when deleting the docker container.
