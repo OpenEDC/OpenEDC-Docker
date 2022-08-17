@@ -22,7 +22,7 @@ You can access it in your browser under http://localhost:3000.
 ## Configure instance
 There is a varity of possible configurations. The easiest way to make use of them is by executing the provided _openedc-run.sh_ script for the bash shell. Unfortunately, you cannot simply run bash scripts in Powershell. One way of executing them on Windows machines is by using the **git bash**.
 The following flags and configurations can be set:
-* -w: Additionally deploys a nginx webserver and redirects the name to the port, so the created instance is abailable under http://localhost/${name} (default name is "default")
+* -w: Additionally deploys a nginx webserver and redirects the name to the port, so the created instance is available under http://localhost/${name} (default name is "default")
 * -p: This flags links your repository folder to the OpenEDC-Server folder inside the container, meaning that all data changes are not store inside the container but in your repository folder. So all data is persitent even when deleting the container.
 * -d: When setting this flag, the command is executed in the background, meaning you will not see the server console outputs and can reuse the same console window.
 * -o: Opens the instance in the browser after creating it. Does only work when setting the -d flag.
@@ -32,6 +32,10 @@ An example would look like this:
 ```
 ./openedc-run -wpdo 3000 yourname
 ```
+
+### SSL
+With the nginx installed by setting the -w flag comes self signed certificate, so the instance is also available under https://localhost/${name}. The reason for this being necessary lies in the requirements of the used web crypto api. By enabling https you are able to deploy the docker image on a vm and make it accessible to other people. Please note that you have to accept the self signed certificate in your browser.
+You **have to** use the **-w** flag when using the script or *-f docker-compose.nginx.yml* when using the raw command (see below @Executing manually).
 
 ## With Powershell
 As written above, the best way is using the git bash. There are other ways of making the configuration possible with Powershell.
