@@ -19,6 +19,7 @@ docker-compose up
 This way an instance is hosted on port 3000 with the name "default". This instance is already pre-initialized, meaning you need credentials to login (User: Admin, Password: Openedctest1). Since it is fully hosted inside the created container so all changes to data are lost when deleting the docker container.
 You can access it in your browser under http://localhost:3000.
 
+
 ## Configure instance
 There is a varity of possible configurations. The easiest way to make use of them is by executing the provided _openedc-run.sh_ script for the bash shell. Unfortunately, you cannot simply run bash scripts in Powershell. One way of executing them on Windows machines is by using the **git bash**.
 The following flags and configurations can be set:
@@ -32,6 +33,19 @@ An example would look like this:
 ```
 ./openedc-run -wpdo 3000 yourname
 ```
+
+### Own instance
+If you would like to start a new instance instead of the default instance, you can do so by assigning it another name, e.g. 
+```
+./openedc-run -wpdo 3000 my_new_instance_name
+```
+You can chose any port, since it is automatically mapped by nginx when starting with the -w flag. We also advise on starting it with the -p flag, since this will lead to all data being stored on your machine in the project folder instead of the container. So your instance still exists, when restarting the container.
+
+After starting a new instance you are presented with the starting screen on OpenEDC. Here you can load a new odm file from disk or the [MDM-Portal](https://medical-data-models.org).
+
+At this moment all data is still saved in our local browser. To sync it with the server all you have left to do is establish a server connection on OpenEDC. To do so simply open *Project Options* (right top corner) and paste the URL in the server url field at the top. Chose an accountname and a passwort and you are set.
+
+This can be useful when you want to share a separate instance you setup on a virtual machine.
 
 ### SSL
 With the nginx installed by setting the -w flag comes a self signed certificate, so the instance is also available under https://localhost/${name}. The reason for this being necessary lies in the requirements of the used web crypto api. By enabling https you are able to deploy the docker image on a vm and make it accessible to other people. Please note that you have to accept the self signed certificate in your browser.
