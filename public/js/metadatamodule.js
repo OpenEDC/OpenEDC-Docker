@@ -28,6 +28,9 @@ export let currentPath = new ODMPath();
 let viewOnlyMode = false;
 let asyncEditMode = false;
 let elementTypeOnDrag = null;
+let currentEditTextarea = null;
+let dataHasChanged = false;
+let formSaveTimer = null;
 
 export async function init() {
     await import("./components/codelistmodal.js");
@@ -45,6 +48,11 @@ export function show() {
     ioHelper.setTreeMaxHeight();
     document.dispatchEvent(new CustomEvent('MetadataFormLoaded'));
 }
+
+ioHelper.addGlobalEventListener("MetadataChanged", e => {
+    enableSaveFormsButton();
+    
+});
 
 function setEditMode() {
     // If connected to a server with more than one user or several subjects, enable the view-only and async-edit mode and ask to disable it
@@ -200,6 +208,7 @@ function loadItemGroupsByForm(hideTree) {
     let itemGroupDefs = metadataWrapper.getItemGroupsByForm(currentPath.formOID);
     for (let itemGroupDef of itemGroupDefs) {
         let translatedDescription = itemGroupDef.getTranslatedDescription(languageHelper.getCurrentLocale());
+        translatedDescription = formatImagesInTranslatedText(translatedDescription);
         let panelBlock = createPanelBlock(itemGroupDef.getOID(), ODMPath.elements.ITEMGROUP, translatedDescription, itemGroupDef.getName());
         panelBlock.onclick = itemGroupClicked;
         $("#item-group-panel-blocks").appendChild(panelBlock);
@@ -228,6 +237,7 @@ function loadItemsByItemGroup(hideTree) {
         let condition = metadataWrapper.getElementCondition(ODMPath.elements.ITEM, path);
         let conditionIsFalse = condition ? condition.getFormalExpression() == "false" : false;
         let translatedQuestion = itemDef.getTranslatedQuestion(languageHelper.getCurrentLocale());
+        translatedQuestion = formatImagesInTranslatedText(translatedQuestion);
         let panelBlock = createPanelBlock(itemDef.getOID(), ODMPath.elements.ITEM, translatedQuestion, itemDef.getName(), languageHelper.getTranslation(itemDef.getDataType()), condition, conditionIsFalse);
         panelBlock.onclick = itemClicked;
         $("#item-panel-blocks").appendChild(panelBlock);
@@ -253,6 +263,7 @@ function loadCodeListItemsByItem(hideTree) {
     let codeListItems = metadataWrapper.getCodeListItemsByItem(currentPath.itemOID);
     for (let codeListItem of codeListItems) {
         let translatedDecode = codeListItem.getTranslatedDecode(languageHelper.getCurrentLocale());
+        translatedDecode = formatImagesInTranslatedText(translatedDecode);
         let panelBlock = createPanelBlock(codeListItem.getCodedValue(), ODMPath.elements.CODELISTITEM, translatedDecode, codeListItem.getCodedValue(), codeListItem.getCodedValue());
         panelBlock.onclick = codeListItemClicked;
         $("#code-list-item-panel-blocks").appendChild(panelBlock);
@@ -276,6 +287,18 @@ function codeListItemClicked(event) {
     reloadDetailsPanel();
 }
 
+function formatImagesInTranslatedText(translatedText) {
+    if(translatedText) {
+        const splits = translatedText.split(/(!\[.*?\](?:\(data:image\/[a-z]+;base64,[a-zA-Z0-9\/+=]+\))?(?:\[(?:[a-z]+:[a-zA-Z0-9%]+?)+;\])?)/g);
+        splits.forEach(split => {
+            if(!split.startsWith('![')) return;
+            const formImageData = metadataWrapper.extractImageInfo(split);
+            translatedText = translatedText.replace(split, `<span class="has-text-link" style="pointer-events: auto;" data-image-id="${formImageData.identifier}" onmouseover="showFormImagePreview(event)" onmouseleave="hideFormImagePreview()">${formImageData.data.name??languageHelper.getTranslation("image")}</span>`);
+        })
+    }
+    return translatedText;
+}
+
 export function reloadTree() {
     loadStudyEvents();
     if (currentPath.studyEventOID) loadFormsByStudyEvent();
@@ -290,8 +313,11 @@ function resetDetailsPanel() {
     $("#save-button").unhighlight();
 
     // Foundational
-    [$("#id-input"), $("#name-input"), $("#translation-textarea"), $("#datatype-select-inner"), $("#mandatory-select-inner")].disableElements();
-    [$("#id-input"), $("#name-input"), $("#translation-textarea"), $("#datatype-select-inner"), $("#mandatory-select-inner")].emptyInputs();
+    [$("#id-input"), $("#name-input"), $("#translation-textarea"), $("#translation-textarea-formatted"), $("#datatype-select-inner"), $("#mandatory-select-inner")].disableElements();
+    [$("#id-input"), $("#name-input"), $("#translation-textarea"), $("#translation-textarea-formatted"), $("#datatype-select-inner"), $("#mandatory-select-inner")].emptyInputs();
+    $("#translation-area-tabs").hide();
+    $("#translation-textarea-formatted").contentEditable = false;
+    activateTranslationAreaTab('translation-textarea');
     $("#element-oid-label").textContent = languageHelper.getTranslation("unique-id");
     $("#element-long-label").textContent = languageHelper.getTranslation("translated-description");
     ioHelper.getSetting("showElementName") ? $("#name-input").parentNode.show() : $("#name-input").parentNode.hide();
@@ -337,9 +363,12 @@ function fillDetailsPanelFoundational() {
     let element = metadataWrapper.getElementDefByOID(currentPath.last.value);
     const elementRef = metadataWrapper.getElementRefByOID(currentPath.last.element, currentPath);
     switch (currentPath.last.element) {
+        case ODMPath.elements.ITEMGROUP:
+            [$("#translation-textarea-formatted")].enableElements();
+            $("#translation-textarea-formatted").contentEditable = true;
+            $("#translation-area-tabs").show();
         case ODMPath.elements.STUDYEVENT:
         case ODMPath.elements.FORM:
-        case ODMPath.elements.ITEMGROUP:
             $("#id-input").value = currentPath.last.value;
             $("#name-input").value = element.getName();
             $("#translation-textarea").value = element.getTranslatedDescription(languageHelper.getCurrentLocale());
@@ -350,6 +379,9 @@ function fillDetailsPanelFoundational() {
             $("#mandatory-select-inner").value = elementRef.getAttribute("Mandatory");
             $("#id-input").value = currentPath.last.value;
             $("#name-input").value = element.getName();
+            $("#translation-area-tabs").show();
+            [$("#translation-textarea-formatted")].enableElements();
+            $("#translation-textarea-formatted").contentEditable = true;
             $("#translation-textarea").value = element.getTranslatedQuestion(languageHelper.getCurrentLocale());
             $("#datatype-select-inner").value = element.getDataType();
             break;
@@ -359,9 +391,105 @@ function fillDetailsPanelFoundational() {
             $("#element-long-label").textContent = languageHelper.getTranslation("translated-choice");
             element = metadataWrapper.getCodeListItem(metadataWrapper.getCodeListOIDByItem(currentPath.itemOID), currentPath.codeListItem);
             $("#id-input").value = element.getCodedValue();
+            $("#translation-area-tabs").show();
+            [$("#translation-textarea-formatted")].enableElements();
+            $("#translation-textarea-formatted").contentEditable = true;
             $("#translation-textarea").value = element.getTranslatedDecode(languageHelper.getCurrentLocale());
     }
 }
+
+function formatTranslationImages(translationText) {
+    if(!translationText) return translationText;
+    let splits = translationText.split(/(!\[.*?\](?:\(data:image\/[a-z]+;base64,[a-zA-Z0-9\/+=]+\))?(?:\[(?:[a-z]+:[a-zA-Z0-9%]+?)+;\])?)/g);
+    splits = splits.map(split => {
+        if(!split.startsWith("![")) return split.replace('\n', '<br>');
+        const imageInfo = metadataWrapper.extractImageInfo(split);
+        return `<div class="has-text-link" data-image-id="${imageInfo.identifier}"
+            onclick="editFormImage(this)" onmouseenter="showFormImagePreview(event)" onmouseleave="hideFormImagePreview()">${imageInfo.data?.name??languageHelper.getTranslation("image")}</div>`
+    });
+    let finalString = splits.join("");
+    return finalString;
+}
+
+function reverseFormatTranslationImages(innerHTML) {
+    const splits = innerHTML.split(/(<div[^>]*>[^/]+?<\/div>)/g);
+    let finalString = splits.map(split => {
+        if(!split.startsWith('<div')) return split.replace('<br>', '\n');
+        if(!split.match(/(<div[^>]*>[^/<>]+?<\/div>)/)) return '';
+        let result = split.match(/(?:data-image-id=\")([a-zA-Z0-9]+)(?:")/);
+        if(result.length > 1) {
+            const imageData = metadataWrapper.getFormImageData(result[1]).data;
+            let imageString =  `![${imageData.name??''}](data:image/${imageData.format??'png'};${imageData.type},${imageData.base64Data})`
+            if(imageData.width) imageString += `[width:${imageData.width};]`;  
+            return imageString;
+        }
+    }).join('').trim();
+    if(finalString == "<br>") return "";
+    return finalString;
+}
+
+window.editFormImage = (image) =>{
+    const formImageData = metadataWrapper.getFormImageData(image.getAttribute('data-image-id'));
+    let modal = document.createElement("form-image-modal");
+    modal.setFormImageData(formImageData.data)
+    modal.setSaveCallback((formImageDataNew) => {
+        if(!formImageDataNew.format) formImageDataNew.format = 'png';
+        metadataWrapper.updateFormImageData(formImageData.identifier, formImageDataNew);
+        highlightSaveButton();
+    });
+    if (!$("#form-image-modal")) document.body.appendChild(modal);
+    languageHelper.localize(modal);
+}
+
+window.showFormImagePreview = (evt) => {
+    const formImageData = metadataWrapper.getFormImageData(evt.target.getAttribute('data-image-id')).data;
+    let elPopup = document.querySelector('#image-preview-container');
+    elPopup.querySelector('img').setAttribute('src', `data:image/${formImageData.format};base64,${formImageData.base64Data}`);
+    elPopup.classList.remove('is-hidden');
+    Object.assign(elPopup.style, {
+        left: `${evt.clientX + window.scrollX}px`,
+        top: `${evt.clientY + window.scrollY}px`,
+        display: `block`,
+    });
+};
+
+window.hideFormImagePreview = () => {
+    let elPopup = document.querySelector('#image-preview-container');
+    elPopup.classList.add('is-hidden');
+}
+
+window.switchTab = (event, oldContainerId, newContainerId, formatted) => {
+    let oldElement = document.querySelector(`#${oldContainerId}`);
+    let newElement = document.querySelector(`#${newContainerId}`);
+    if(oldElement.classList.contains('is-hidden')) return;
+
+    if(formatted) {
+        let oldContent = oldElement.querySelector('.textarea').value;
+        let newContent = formatTranslationImages(oldContent);
+        newElement.querySelector('.textarea').innerHTML = newContent;
+        currentEditTextarea = 'translation-textarea-formatted'
+    } else{
+        let oldContent = oldElement.querySelector('.textarea').innerHTML;
+        let newContent = reverseFormatTranslationImages(oldContent);
+        newElement.querySelector('.textarea').value = newContent;
+        currentEditTextarea = 'translation-textarea'
+    } 
+
+    [...event.target.closest('ul').querySelectorAll('li')].forEach(li => li.classList.remove('is-active'))
+    event.target.parentNode.classList.add('is-active');
+    oldElement.classList.add('is-hidden');
+    newElement.classList.remove('is-hidden');
+    
+}
+
+function activateTranslationAreaTab(name) {
+    [...$(`#${name}-link`).closest('ul').querySelectorAll('li')].forEach(li => li.classList.remove('is-active'))
+    $(`#${name}-link`).classList.add('is-active');
+    [...$('#translation-text-sections-container').querySelectorAll('section')].forEach(section => section.classList.add('is-hidden'));
+    $(`#${name}-container`).classList.remove('is-hidden');
+    currentEditTextarea = name;
+}
+
 
 function fillDetailsPanelExtended() {
     fillElementAliases();
@@ -373,6 +501,7 @@ function fillDetailsPanelExtended() {
             $("#repeating-select-inner").value = metadataWrapper.getStudyEventRepeating(currentPath.last.value);
             $("#repeating-select-inner").disabled = false;
             break;
+        case ODMPath.elements.FORM:
         case ODMPath.elements.ITEMGROUP:
             $("#collection-condition").value = condition ? condition.getFormalExpression() : "";
             $("#collection-condition").disabled = false;
@@ -498,6 +627,7 @@ window.showSettingsEditor = function() {
     settingsModal.setCloseCallback(async (settings) => { 
         metadataWrapper.setCurrentElementSettings(currentPath, settings); 
         if(!asyncEditMode) await metadataWrapper.storeMetadata();
+        else ioHelper.dispatchGlobalEvent('MetadataChanged');
         reloadDetailsPanel();
     });
     settingsModal.setSize("is-wide");
@@ -506,12 +636,25 @@ window.showSettingsEditor = function() {
     languageHelper.localize();
 }
 
+window.showExternalLinksEditor = async function() {
+    //await import("./components/externallinksmodal.js");
+    let externallinkmodal = document.createElement('external-links-modal');
+    externallinkmodal.setAliasses(metadataWrapper.getElementAliases(currentPath));
+    externallinkmodal.setPath(currentPath);
+    externallinkmodal.setTitle(languageHelper.getTranslation('external-links'))
+    externallinkmodal.setCloseCallback(() => {
+        reloadDetailsPanel();
+        if (!asyncEditMode) metadataWrapper.storeMetadata();
+        else ioHelper.dispatchGlobalEvent('MetadataChanged');
+    });
+    document.body.appendChild(externallinkmodal);
+}
+
 window.saveElement = async function() {
     if (getCurrentDetailsView() == detailsPanelViews.FOUNDATIONAL) await saveDetailsFoundational();
     else if (getCurrentDetailsView() == detailsPanelViews.EXTENDED) await saveDetailsExtended();
     document.dispatchEvent(new CustomEvent("SaveElementPressed", {detail: { activeView: getCurrentDetailsView()}}));
-    if (ioHelper.hasServerURL() && asyncEditMode && (admindataWrapper.getUsers().length > 1 || clinicaldataWrapper.getSubjects().length > 1) && $("#store-metadata-async-button")) 
-        $("#store-metadata-async-button").disabled = false;
+    enableSaveFormsButton();
 }
 
 export async function saveDetailsFoundational() {
@@ -522,20 +665,23 @@ export async function saveDetailsFoundational() {
         case ODMPath.elements.ITEMGROUP:
             await setElementOID($("#id-input").value).then(() => {
                 metadataWrapper.setElementName(currentPath.last.value, ioHelper.getSetting("showElementName") ? $("#name-input").value : $("#id-input").value);
-                metadataWrapper.setElementDescription(currentPath.last.value, $("#translation-textarea").value);
+                const translationValue = currentEditTextarea === 'translation-textarea' ? $("#translation-textarea").value : reverseFormatTranslationImages($("#translation-textarea-formatted").innerHTML);
+                metadataWrapper.setElementDescription(currentPath.last.value, translationValue);
             });
             break;
         case ODMPath.elements.ITEM:
             await setElementOID($("#id-input").value).then(() => {
                 metadataWrapper.setElementName(currentPath.last.value, ioHelper.getSetting("showElementName") ? $("#name-input").value : $("#id-input").value);
-                metadataWrapper.setItemQuestion(currentPath.last.value, $("#translation-textarea").value);
+                const translationValue = currentEditTextarea === 'translation-textarea' ? $("#translation-textarea").value : reverseFormatTranslationImages($("#translation-textarea-formatted").innerHTML);
+                metadataWrapper.setItemQuestion(currentPath.last.value, translationValue);
             });
             metadataWrapper.setElementMandatory(currentPath.last.element, currentPath, $("#mandatory-select-inner").value);
             handleItemDataType(currentPath.last.value, $("#datatype-select-inner").value);
             break;
         case ODMPath.elements.CODELISTITEM:
             await setCodeListItemCodedValue($("#id-input").value);
-            metadataWrapper.setCodeListItemDecodedText(metadataWrapper.getCodeListOIDByItem(currentPath.itemOID), currentPath.codeListItem, $("#translation-textarea").value);
+            const translationValue = currentEditTextarea === 'translation-textarea' ? $("#translation-textarea").value : reverseFormatTranslationImages($("#translation-textarea-formatted").innerHTML);
+            metadataWrapper.setCodeListItemDecodedText(metadataWrapper.getCodeListOIDByItem(currentPath.itemOID), currentPath.codeListItem, translationValue);
     }
 
     if (!languageHelper.getPresentLanguages().includes(languageHelper.getCurrentLocale())) {
@@ -584,6 +730,7 @@ export async function saveDetailsExtended() {
         case ODMPath.elements.STUDYEVENT:
             await saveRepeating();
             break;
+        case ODMPath.elements.FORM:
         case ODMPath.elements.ITEMGROUP:
             if (saveConditionPreCheck()) return;
             break;
@@ -605,6 +752,7 @@ async function saveRepeating() {
     if(!asyncEditMode) {
         // without async mode, we can just change the StudyEventRepeatingKey of every affected subject right away
         resolved = await clinicaldataWrapper.setStudyEventDataRepeating({studyEventOID: currentPath.last.value, boolRepeating: $("#repeating-select-inner").value === "Yes"});
+        if(resolved) clinicaldataWrapper.loadSubject(null);
     }
     else {
         // with async mode enabled we only have to check, whether a change is theoretically possible...
@@ -627,6 +775,7 @@ function saveConditionPreCheck() {
     const currentCondition = metadataWrapper.getElementCondition(currentPath.last.element, currentPath);
     if (formalExpression && currentCondition && formalExpression == currentCondition.getFormalExpression()) return;
     if (formalExpressionContainsError(formalExpression)) return true;
+    if (formalExpressionContainsLogicErrors(formalExpression, currentPath)) return true;
 
     const currentElementRef = metadataWrapper.getElementRefByOID(currentPath.last.element, currentPath);
     if (currentCondition) {
@@ -772,6 +921,36 @@ function formalExpressionContainsError(formalExpression) {
         return true;
     }
 }
+function formalExpressionContainsLogicErrors(formalExpression, elementPath) {
+    if(!formalExpression) return false;
+    const parsedExpression = expressionHelper.parse(formalExpression);
+    let iVars = parsedExpression.tokens.filter(token => token.type == "IVAR").concat(parsedExpression.tokens.filter(token => token.type == "IEXPR").flatMap(token => token.value.filter(tokenValue => tokenValue.type == "IVAR")));
+    let itemOIDs = [];
+    switch(elementPath.last.element) {
+        case ODMPath.elements.ITEM:
+            return false;
+        case ODMPath.elements.ITEMGROUP:
+            itemOIDs = metadataWrapper.getItemsByItemGroup(elementPath.last.value).map(item => item.getAttribute('OID'));
+            for(let iVar of iVars) {
+                if(itemOIDs.indexOf(iVar.value) >= 0) {
+                    ioHelper.showMessage(languageHelper.getTranslation("error"), languageHelper.getTranslation("formal-expression-logic-error"));
+                    return true;
+                }
+            }
+            break;
+        case ODMPath.elements.FORM:
+            itemOIDs = metadataWrapper.getItemGroupsByForm(elementPath.last.value).flatMap(itemGroup => metadataWrapper.getItemsByItemGroup(itemGroup.getAttribute("OID"))).map(item => item.getAttribute('OID'));
+            for(let iVar of iVars) {
+                let iVarPath = ODMPath.parseRelative(expressionHelper.unescapePaths(iVar.value));
+                if(!iVarPath.formOID || iVarPath.formOID === elementPath.last.value) {
+                    ioHelper.showMessage(languageHelper.getTranslation("error"), languageHelper.getTranslation("formal-expression-logic-error"));
+                    return true;
+                }
+            }
+            break;
+    }
+    return false;  
+}
 
 window.sidebarOptionClicked = async function(event) {
     // Save the element if it has been updated and another sidebar option is selected
@@ -794,7 +973,6 @@ function showDetailsPanelView({panel}) {
 }
 
 function handleItemDataType(itemOID, dataType) {
-
     let dataTypeIsCodeList = dataType.startsWith("codelist");
     let codeListType = dataTypeIsCodeList ? dataType.split("-")[1] : null;
 
@@ -816,7 +994,7 @@ function handleItemDataType(itemOID, dataType) {
 }
 
 function setIOListeners() {
-    let inputElements = $$("#details-panel input, #details-panel textarea, #details-panel select");
+    let inputElements = $$("#details-panel input, #details-panel textarea, #details-panel select, #details-panel #translation-textarea-formatted");
     for (const inputElement of inputElements) {
         inputElement.oninput = () => highlightSaveButton();
         inputElement.onkeydown = event => {
@@ -831,6 +1009,10 @@ function setIOListeners() {
             }
         };
     }
+    $("#translation-textarea-formatted").onblur = () => {
+        $("#translation-textarea-formatted").innerHTML = formatTranslationImages($("#translation-textarea-formatted").innerHTML)
+    };
+
     $("#id-input").addEventListener("keydown", event => {
         // Replace the following characters with an underscore required for evaluating formal expressions
         if (["-", "_", "(", ")", "/", "#", " "].includes(event.key)) {
@@ -860,6 +1042,7 @@ window.addStudyEvent = function(event) {
     switchToPanelView(detailsPanelViewIdentifiers.FOUNDATIONAL);
     ioHelper.scrollParentToChild($(`#study-event-panel-blocks [oid="${currentPath.studyEventOID}"]`));
     if (!asyncEditMode) metadataWrapper.storeMetadata();
+    enableSaveFormsButton();
     event.target.blur();
 
     // Show the first study event help message
@@ -873,6 +1056,7 @@ window.addForm = function(event) {
     switchToPanelView(detailsPanelViewIdentifiers.FOUNDATIONAL);
     ioHelper.scrollParentToChild($(`#form-panel-blocks [oid="${currentPath.formOID}"]`));
     if (!asyncEditMode) metadataWrapper.storeMetadata();
+    enableSaveFormsButton();
     event.target.blur();
 }
 
@@ -883,6 +1067,7 @@ window.addItemGroup = function(event) {
     switchToPanelView(detailsPanelViewIdentifiers.FOUNDATIONAL);
     ioHelper.scrollParentToChild($(`#item-group-panel-blocks [oid="${currentPath.itemGroupOID}"]`));
     if (!asyncEditMode) metadataWrapper.storeMetadata();
+    enableSaveFormsButton();
     event.target.blur();
 }
 
@@ -893,6 +1078,7 @@ window.addItem = function(event) {
     switchToPanelView(detailsPanelViewIdentifiers.FOUNDATIONAL);
     ioHelper.scrollParentToChild($(`#item-panel-blocks [oid="${currentPath.itemOID}"]`));
     if (!asyncEditMode) metadataWrapper.storeMetadata();
+    enableSaveFormsButton();
     event.target.blur();
 }
 
@@ -905,7 +1091,36 @@ window.addCodeListItem = function(event) {
         ioHelper.scrollParentToChild($(`#code-list-item-panel-blocks [oid="${currentPath.codeListItem}"]`));
     }
     if (!asyncEditMode) metadataWrapper.storeMetadata();
+    enableSaveFormsButton();
     event.target.blur();
+}
+
+function enableSaveFormsButton() {
+    if (ioHelper.hasServerURL() && asyncEditMode && (admindataWrapper.getUsers().length > 1 || clinicaldataWrapper.getSubjects().length > 1) && $("#store-metadata-async-button")) {
+        $("#store-metadata-async-button-notification").show();
+        dataHasChanged = true;
+        if(!formSaveTimer) {
+            setFormSaveTimeout();
+        }
+    }
+}
+
+function setFormSaveTimeout() {
+    
+    clearFormSaveTimeout();
+    formSaveTimer = setTimeout(() => {
+        console.log("speichern!");
+        ioHelper.showMessage(languageHelper.getTranslation('save-reminder'), languageHelper.getTranslation('save-reminder-hint'),
+            {
+                [languageHelper.getTranslation('save')]: () => executeStoreData(),
+                [languageHelper.getTranslation('show-again')]: () => setFormSaveTimeout()
+            }
+        , null, null, null, null, true);
+    }, 10*60*1000)
+}
+
+function clearFormSaveTimeout() {
+    if(formSaveTimer) clearTimeout(formSaveTimer);
 }
 
 function removeElement() {
@@ -936,6 +1151,7 @@ function removeElement() {
     }
 
     reloadAndStoreMetadata();
+    enableSaveFormsButton();
     ioHelper.showToast(languageHelper.getTranslation("element-removed"), 2500);
 }
 
@@ -1098,9 +1314,7 @@ function enableAsyncEditMode() {
     // TODO: Cache all subject data
 
     ioHelper.showToast(languageHelper.getTranslation("edit-mode-enabled-hint"), 5000);
-    $("#store-metadata-async-button").show();
-    $("#store-metadata-async-button").disabled = true;
-
+    dataHasChanged = false;
     viewOnlyMode = false;
     reloadTree();
     reloadDetailsPanel();
@@ -1112,18 +1326,30 @@ window.toggleMoreExtendedOptions = function() {
     document.activeElement.blur();
 }
 
-window.storeMetadataAsync = function() {
+window.storeMetadataAsync = async (skipMessage = false) => {
+    if(skipMessage) return executeStoreData();
+
     ioHelper.showMessage(languageHelper.getTranslation("please-confirm"), languageHelper.getTranslation("save-forms-question"),
         {
             [languageHelper.getTranslation("save")]: async () => {
-                ioHelper.showToast(languageHelper.getTranslation("forms-saving-hint"), 60000, ioHelper.interactionTypes.WARNING, null, true);
-                $("#store-metadata-async-button").disabled = true;
-                await clinicaldataWrapper.resolvePendingChanges();
-                await metadataWrapper.storeMetadata();
-                ioHelper.showToast(languageHelper.getTranslation("forms-saved-hint"), 5000);
+                await executeStoreData();
             }
         }
     );
+}
+
+async function executeStoreData() {
+    ioHelper.showToast(languageHelper.getTranslation("forms-saving-hint"), 60000, ioHelper.interactionTypes.WARNING, null, true);
+                
+    $("#store-metadata-async-button-notification").hide();
+    if(formSaveTimer) {
+        clearTimeout(formSaveTimer);
+        formSaveTimer = null;
+    }
+    const resolved = await clinicaldataWrapper.resolvePendingChanges();
+    await metadataWrapper.storeMetadata();
+    dataHasChanged = false;
+    ioHelper.showToast(languageHelper.getTranslation("forms-saved-hint"), 5000);
 }
 
 function showFirstEventEditedHelp() {
@@ -1137,3 +1363,30 @@ function showFirstEventEditedHelp() {
 export function getIsAsyncEditMode() {
     return asyncEditMode;
 }
+
+window.specifyDateSetting = (currentOID, newValueCallback) => {
+    const element = metadataWrapper.getElementDefByOID(currentOID);
+    if(element.getAttribute("DataType") !== 'date') {
+        ioHelper.showToast("No Date Element", 4000, ioHelper.interactionTypes.WARNING);
+        return;
+    }
+    let dateSettingsModal = document.createElement('date-settings-modal');
+    dateSettingsModal.setCallback((value) => newValueCallback(value))
+    dateSettingsModal.setCurrentValues(metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'date-setting', currentOID))
+    if (!$("#date-settings-modal")) document.body.appendChild(dateSettingsModal);
+    languageHelper.localize(dateSettingsModal)
+
+    //newValueCallback(`string for element with oid ${currentOID}`);
+ }
+
+ export function dataChanged(callback) {
+    if(!dataHasChanged) return false;
+    ioHelper.showMessage(languageHelper.getTranslation('unsaved-data'), languageHelper.getTranslation('unsaved-data-text'), 
+        {
+            [languageHelper.getTranslation("save-and-leave")]: async () => { await storeMetadataAsync(true); callback(); },
+            [languageHelper.getTranslation("ignore-and-leave")]: async () => { dataHasChanged = false; clearFormSaveTimeout(); callback(); }
+        },
+        ioHelper.interactionTypes.DEFAULT
+    );
+    return true;
+ }

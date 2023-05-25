@@ -15,7 +15,7 @@ export class Credentials {
         PASSWORDPATTERNVIOLATION: "password-not-secure"
     };
     
-    constructor(username, password, confirmPassword) {
+    constructor(username, password, confirmPassword, ownerProtected) {
         // Do not throw error since validation is not desired in all instances (e.g., not when setting a new inital user password)
         if (!username || !password || confirmPassword === "") this.error = Credentials.errors.NOTALLFIELDSENTERED;
         else if ((confirmPassword || confirmPassword === "") && password != confirmPassword) this.error = Credentials.errors.PASSWORDSNOTEQUAL;
@@ -23,6 +23,7 @@ export class Credentials {
 
         this._username = username;
         this._password = password;
+        this._ownerProtected = ownerProtected;
     }
 
     get username() {
@@ -31,6 +32,10 @@ export class Credentials {
 
     get password() {
         return this._password;
+    }
+
+    get ownerProtected() {
+        return this._ownerProtected;
     }
 }
 
@@ -72,7 +77,8 @@ export const interactionTypes = {
 
 const fileTypes = {
     XML: "xml",
-    JSON: "json"
+    JSON: "json",
+    TEXT: "text"
 }
 
 export const userRights = {
@@ -107,7 +113,7 @@ export async function init() {
 export async function getODM(fileName) {
     let xmlString = await getData(fileName, fileTypes.XML);
     if (!xmlString) throw new LoadXMLException(loadXMLExceptionCodes.NODATAFOUND)
-    
+
     if (decryptionKey) {
         try {
             xmlString = await cryptoHelper.AES.decrypt.withKey(xmlString, decryptionKey);
@@ -125,11 +131,11 @@ export async function getODM(fileName) {
     }
 }
 
-export async function setODM(fileName, xmlDocument) {
+export async function setODM(fileName, xmlDocument, disableEncryption, oldFileName) {
     let xmlString = new XMLSerializer().serializeToString(xmlDocument);
-    if (decryptionKey) xmlString = await cryptoHelper.AES.encrypt.withKey(xmlString, decryptionKey);
+    if (decryptionKey && !disableEncryption) xmlString = await cryptoHelper.AES.encrypt.withKey(xmlString, decryptionKey);
 
-    await setData(fileName, xmlString, fileTypes.XML);
+    await setData(fileName, xmlString, fileTypes.XML, oldFileName);
 }
 
 export async function removeODM(fileName) {
@@ -138,7 +144,7 @@ export async function removeODM(fileName) {
 
 // For performance reasons of IndexedDB, only used for local storage
 export async function setODMBulk(fileNameList, dataList) {
-    await indexedDBHelper.putBulk(fileNameList, dataList, fileTypes.XML);
+    await indexedDBHelper.putBulk(fileNameList, dataList, fileTypes.XML)   ;
 }
 
 export async function getJSON(fileName) {
@@ -170,9 +176,9 @@ async function getData(fileName, fileType) {
     }
 }
 
-async function setData(fileName, content, fileType) {
+async function setData(fileName, content, fileType, oldFileName) {
     if (serverURL) {
-        await fetch(getURLForFileName(fileName, fileType), {
+        await fetch(getURLForFileName(fileName, fileType, oldFileName), {
             method: "PUT",
             headers: getHeaders(true),
             body: content
@@ -193,15 +199,22 @@ async function removeData(fileName, fileType) {
     }
 }
 
-function getURLForFileName(fileName, fileType) {
+function getURLForFileName(fileName, fileType, oldFileName) {
     let url = serverURL + "/api/";
     switch (fileType) {
         case fileTypes.XML:
             const odmType = Object.values(odmFileNames).find(entry => fileName.includes(entry));
-            return url + (odmType ? odmType : odmFileNames.clinicaldata) + "/" + fileName;
+            url = url +  (odmType ? odmType : odmFileNames.clinicaldata) + "/" + fileName;
+            break;
         case fileTypes.JSON:
-            return url + fileTypes.JSON + "/" + fileName;
+            url = url + fileTypes.JSON + "/" + fileName;
+            break;
+        case fileTypes.TEXT:
+            url = url + fileTypes.TEXT + "/" + fileName;
+            break;
     }
+    if(oldFileName) url += '?deleteOld=' + oldFileName;
+    return url;
 }
 
 export async function getLastServerUpdate() {
@@ -240,6 +253,22 @@ export async function getSubjectFileNames() {
     return subjectFileNames;
 }
 
+export async function sendProjectDeletionInfo() {
+    if (serverURL) {
+        const response = await fetch(serverURL + "/api/project/delete", { method: "DELETE",headers: getHeaders(true) });
+        if(response.ok) return true;
+        return false;
+    }
+}
+
+export async function sendClinicalDataDeletionInfo() {
+    if (serverURL) {
+        const response = await fetch(serverURL + "/api/project/clinicaldata/delete", { method: "DELETE",headers: getHeaders(true) });
+        if(response.ok) return true;
+        return false;
+    }
+}
+
 // Only for local encryption
 export async function encryptXMLData(password) {
     // Generate new cryptoHelper.AES encryption/decryption key
@@ -271,6 +300,11 @@ export async function setDecryptionKey(password) {
     } catch (error) {
         return Promise.reject(error);
     }
+}
+
+export const deactivateServerEncryption = async () => {
+    decryptionKey = null;
+    await setSetting('disableEncryption', true);
 }
 
 export async function removeAllLocalData() {
@@ -331,14 +365,14 @@ export async function getServerStatus(url, storeServerURL) {
     }
 }
 
-export async function initializeServer(url, userOID, credentials) {
+export async function initializeServer(url, userOID, credentials, disableEncryption = false) {
     if (!url.includes("http") && !url.includes("https")) url = "https://" + url;
     
     // Create a random key that is used for data encryption and encrypt it with the password of the user
     const decryptionKey = await cryptoHelper.AES.generateKey();
     const encryptedDecryptionKey = await cryptoHelper.AES.encrypt.withPassword(decryptionKey, credentials.password);
     const authenticationKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(credentials.username, credentials.password);
-    const userRequest = { username: credentials.username, authenticationKey, encryptedDecryptionKey };
+    const userRequest = { username: credentials.username, authenticationKey, encryptedDecryptionKey, ownerProtected: credentials.ownerProtected };
 
     // Create the owner user on the server
     const userResponse = await fetch(url + "/api/users/initialize/" + userOID, {
@@ -354,7 +388,7 @@ export async function initializeServer(url, userOID, credentials) {
     const metadataFileName = await getODMFileName(odmFileNames.metadata);
     const metadataXMLData = await getODM(metadataFileName);
     let metadataString = new XMLSerializer().serializeToString(metadataXMLData);
-    metadataString = await cryptoHelper.AES.encrypt.withKey(metadataString, decryptionKey);
+    if(!disableEncryption) metadataString = await cryptoHelper.AES.encrypt.withKey(metadataString, decryptionKey);
     const metadataResponse = await fetch(url + "/api/metadata/" + metadataFileName, {
         method: "PUT",
         headers: getHeaders(true),
@@ -366,7 +400,7 @@ export async function initializeServer(url, userOID, credentials) {
     const admindataFileName = await getODMFileName(odmFileNames.admindata);
     const admindataXMLData = await getODM(admindataFileName);
     let admindataString = new XMLSerializer().serializeToString(admindataXMLData.documentElement);
-    admindataString = await cryptoHelper.AES.encrypt.withKey(admindataString, decryptionKey);
+    if(!disableEncryption) admindataString = await cryptoHelper.AES.encrypt.withKey(admindataString, decryptionKey);
     const admindataResponse = await fetch(url + "/api/admindata/" + admindataFileName, {
         method: "PUT",
         headers: getHeaders(true),
@@ -379,7 +413,7 @@ export async function initializeServer(url, userOID, credentials) {
     for (const subjectFileName of subjectFileNames) {
         const subjectDataXMLData = await getODM(subjectFileName);
         let subjectDataString = new XMLSerializer().serializeToString(subjectDataXMLData.documentElement);
-        subjectDataString = await cryptoHelper.AES.encrypt.withKey(subjectDataString, decryptionKey);
+        if(!disableEncryption) subjectDataString = await cryptoHelper.AES.encrypt.withKey(subjectDataString, decryptionKey);
         const clinicaldataResponse = await fetch(url + "/api/clinicaldata/" + subjectFileName, {
             method: "PUT",
             headers: getHeaders(true),
@@ -399,30 +433,59 @@ export async function initializeServer(url, userOID, credentials) {
         if (!jsonResponse.ok) return Promise.reject(await jsonResponse.text());
     }
 
+    serverURL = url;
+    await setSetting('disableEncryption', disableEncryption);
+
     await removeAllLocalData();
     
     return Promise.resolve(url);
 }
 
-export async function loginToServer(credentials) {
-    const authenticationKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(credentials.username, credentials.password);
-    const userResponse = await fetch(serverURL + "/api/users/me", {
-        headers: { "Authorization" : `Basic ${btoa(credentials.username + ":" + authenticationKey)}` }
-    });
+export async function loginToServer(credentials, urlSearchParams, useAsParameters = false) {
+    //try logging in with cookie
+    let userResponse;
+    let url = new URL(`${serverURL}/api/users/me`)
+    if(useAsParameters) {
+        if(urlSearchParams) [...urlSearchParams.entries()].forEach(([key, value]) => url.searchParams.set(key, value));
+        userResponse = await fetch(url);
+    } else if (credentials){
+        const authenticationKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(credentials.username, credentials.password);
+        userResponse = await fetch(url, {
+            headers: { "Authorization" : `Basic ${btoa(credentials.username + ":" + authenticationKey)}` }
+        });
+    } else {
+        userResponse = await fetch(url);
+    }
     if (!userResponse.ok) return Promise.reject(loginStatus.WRONGCREDENTIALS);
     user = await userResponse.json();
-
+    await loadSettings();
     // Get the encryptedDecryptionKey of the user, decrypt it and store it in the decryptionKey variable
-    try {
-        decryptionKey = await cryptoHelper.AES.decrypt.withPassword(user.encryptedDecryptionKey, credentials.password);
-    } catch (error) {
-        return Promise.reject(loginStatus.WRONGCREDENTIALS);
+    let encryptionDisabled = await getSetting("disableEncryption");
+    if(typeof encryptionDisabled == 'undefined' || encryptionDisabled === '') {
+        encryptionDisabled = false;
+        await setSetting('disableEncryption', encryptionDisabled);
     }
-
+    if(!encryptionDisabled) {
+        try {
+            decryptionKey = await cryptoHelper.AES.decrypt.withPassword(user.encryptedDecryptionKey, credentials.password);
+        } catch (error) {
+            return Promise.reject(loginStatus.WRONGCREDENTIALS);
+        }
+    }
     // Test if the user has an initial password
     if (user.hasInitialPassword) return Promise.reject(loginStatus.USERHASINITIALPASSWORD);
 
     return Promise.resolve();
+}
+
+export async function logout() {
+    if(serverURL) {
+        await fetch(serverURL + "/api/users/logout", {
+            method: "GET",
+            headers: getHeaders(true),
+        });
+    }
+    window.location.reload();
 }
 
 export async function setOwnPassword(credentials) {
@@ -443,14 +506,14 @@ export async function setOwnPassword(credentials) {
 
 // TODO: Naming -- should I add a new serverhelper.js that handles all server communication?
 // TODO: Setting the currently logged in user in this location good approach?
-export async function setUserOnServer(oid, credentials, rights, site) {
+export async function setUserOnServer(oid, credentials, rights, site, ownerProtected = false) {
     let userRequest = null;
     if (credentials.username && credentials.password) {
         const encryptedDecryptionKey = await cryptoHelper.AES.encrypt.withPassword(decryptionKey, credentials.password);
         const authenticationKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(credentials.username, credentials.password);
-        userRequest = { username: credentials.username, authenticationKey, encryptedDecryptionKey, rights, site };
+        userRequest = { username: credentials.username, authenticationKey, encryptedDecryptionKey, rights, site, ownerProtected };
     } else {
-        userRequest = { rights, site };
+        userRequest = { rights, site, ownerProtected };
     }
 
     const userResponse = await fetch(serverURL + "/api/users/" + oid, {
@@ -512,24 +575,31 @@ export async function emptyMessageQueue() {
     for (let messageQueueEntry of messageQueueEntries) {
         const cacheResponse = await messageQueue.match(messageQueueEntry);
         const requestBody = await cacheResponse.text();
-        await fetch(messageQueueEntry.url, {
-            method: "PUT",
-            headers: getHeaders(true),
-            body: requestBody
-        });
-
-        // When cinical subject data from the message queue was sent to the server, a previous version might still be stored there which needs to be removed
-        // TODO: While this works fine, it should be refactored
-        if (!messageQueueEntry.url.includes("clinicaldata")) continue;
-        const subjectKey = messageQueueEntry.url.substring(messageQueueEntry.url.lastIndexOf("/") + 1).split(fileNameSeparator)[0];
-        for (let odmCacheEntry of odmCacheEntries) {
-            if (odmCacheEntry.url.includes("/" + subjectKey + fileNameSeparator)) {
-                await fetch(odmCacheEntry.url, {
-                    method: "DELETE",
-                    headers: getHeaders(true)
-                });
+        try{
+            await fetch(messageQueueEntry.url, {
+                method: "PUT",
+                headers: getHeaders(true),
+                body: requestBody
+            });
+            messageQueue.delete(messageQueueEntry.url);
+    
+            // When cinical subject data from the message queue was sent to the server, a previous version might still be stored there which needs to be removed
+            // TODO: While this works fine, it should be refactored
+            if (!messageQueueEntry.url.includes("clinicaldata")) continue;
+            const subjectKey = messageQueueEntry.url.substring(messageQueueEntry.url.lastIndexOf("/") + 1).split(fileNameSeparator)[0];
+            for (let odmCacheEntry of odmCacheEntries) {
+                if (odmCacheEntry.url.includes("/" + subjectKey + fileNameSeparator)) {
+                    await fetch(odmCacheEntry.url, {
+                        method: "DELETE",
+                        headers: getHeaders(true)
+                    });
+                    odmCacheEntries.delete(odmCacheEntry.url);
+                }
             }
+        } catch (e) {
+            //continue with next
         }
+        
     }
 }
 
@@ -560,6 +630,7 @@ export function showMessage(heading, message, callbacks, callbackType, closeText
     messageModal.setIsSticky(isSticky ?? false)
     
     if (!$("#message-modal")) document.body.appendChild(messageModal);
+    return messageModal;
 }
 
 export function showToast(message, duration, toastType, buttons, showLoadingBar) {
@@ -567,7 +638,7 @@ export function showToast(message, duration, toastType, buttons, showLoadingBar)
     toast.classList = "notification is-toast";
     toast.classList.add(toastType ?? interactionTypes.SUCCESS);
     let span = document.createElement('span');
-    span.innerText = message;
+    span.innerHTML = message;
     toast.appendChild(span);
 
     if(buttons) {
@@ -651,7 +722,7 @@ export async function downloadAsZip(filename, contentFiles) {
     
     const zip = new JSZip();
     contentFiles.forEach(({filename, extension, content}) => {
-        zip.file(`${filename}.${extension}`, content);
+        zip.file(`${filename}.${extension}`, content);f
     });
     zip.generateAsync({type: 'blob'}).then(zipFile => {
         saveAs(zipFile, `${filename}.zip`);

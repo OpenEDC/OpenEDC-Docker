@@ -16,7 +16,7 @@ import { OpenEDCNotification, OpenEDCNotificationAction } from "./helper/notific
 import * as notificationHelper from "./helper/notificationhelper.js";
 import * as htmlElements from "./helper/htmlelements.js"
 
-const appVersion = "0.8.1.4";
+const appVersion = "0.9.2";
 
 export const appModes = {
     METADATA: "metadata",
@@ -29,6 +29,8 @@ const appStates = {
     LOCKED: "locked",
     UNLOCKED: "unlocked"
 }
+
+let currentAppMode;
 
 let versionCheckInterval;
 let pauseUpdateCheck = false;
@@ -54,22 +56,40 @@ ioHelper.addGlobalEventListener("DOMContentLoaded", async () => {
 
     // Check if this app might be served from an OpenEDC Server instance and then show the login modal accordingly
     await ioHelper.init()
-        .then(serverStatus => {
-            if (serverStatus == ioHelper.serverStatus.SERVERINITIALIZED) showLoginModal();
+        .then(async serverStatus => {
+            if (serverStatus == ioHelper.serverStatus.SERVERINITIALIZED) {
+                await attemptToLogin()
+            }
             else if (serverStatus == ioHelper.serverStatus.SERVERNOTINITIALIZED) showUninitializedHint();
             else if (serverStatus == ioHelper.serverStatus.SERVERNOTFOUND) console.log("No OpenEDC Server found. It seems that this is a standalone OpenEDC App.");
         });
-
+    
     // Initialize the application
     await metadataWrapper.loadStoredMetadata()
-        .catch(error => {
-            if (error.code == ioHelper.loadXMLExceptionCodes.NODATAFOUND && !ioHelper.hasServerURL()) showStartModal();
-            else if (error.code == ioHelper.loadXMLExceptionCodes.DATAENCRYPTED) showDecryptionKeyModal();
+    .then(async () => {
+        await startApp();
+        handleURLSearchParameters();
+    })
+    .catch(async error => {
+        console.log(error);
+            if (error.code == ioHelper.loadXMLExceptionCodes.NODATAFOUND && !ioHelper.hasServerURL()) {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (!urlParams.toString()) {
+                    showStartModal();
+                }
+                else {
+                    newProject();
+                    await handleURLSearchParameters(true);
+                }     
+            }
+            else if (error.code == ioHelper.loadXMLExceptionCodes.DATAENCRYPTED) {
+                if(ioHelper.hasServerURL()) showLoginModal();
+                else showDecryptionKeyModal();
+            }
         });
-    await startApp();
-
+    
     // Handle URL search / query parameters (e.g., for metadata repository integration)
-    handleURLSearchParameters();
+    
 
     // Register service worker for offline capabilities
     const developmentOrigins = ["localhost", "127.0.0.1", "dev.openedc.org", "mdm.mi.uni-heidelberg.de/openedc-dev/"];
@@ -98,10 +118,12 @@ const startApp = async () => {
     languageHelper.populatePresentLanguages(metadataWrapper.getMetadata());
     await languageHelper.setInitialLocale();
     
+    console.log("init metadatamodule");
     await metadataModule.init();
+    console.log("init admindatamodule");
     await admindataModule.init();
+    console.log("init clinicaldatamodule");
     await clinicaldataModule.init();
-
     // Last UI adjustments
     setTitles();
     hideStartModal();
@@ -122,7 +144,6 @@ const startApp = async () => {
 
     // Only required because of a bug in Safari (selects without a value show a value if the textContent of their option elements is changed -- which happens during localize())
     if (getCurrentMode() == appModes.METADATA) metadataModule.reloadDetailsPanel();
-
     // After all, check app version, subscribe to server updates, and enable plugins
     attachUpdateListenerToServiceWorker();
     checkVersionAndShowNotification();
@@ -175,6 +196,28 @@ function showCloseExampleButton() {
     if (metadataWrapper.getStudyName() == languageHelper.getTranslation("exemplary-project")) $("#close-example-button").show(); 
 }
 
+async function attemptToLogin() {
+    console.log("attemt to login")
+    //first we check for given parameters
+    //then we try using our already set cookies
+    const urlParams = new URLSearchParams(window.location.search);
+    let username = urlParams.get("username");
+    let password = urlParams.get("password");
+
+    let credentials;
+    if(username && password) credentials = new ioHelper.Credentials(username, password);
+    await ioHelper.loginToServer(credentials, urlParams, true).then(
+        () => {
+            return true;
+            //window.history.replaceState(null, appVersion, ioHelper.getBaseURL());
+        },
+        (status) => {
+            if(status != ioHelper.loginStatus.USERHASINITIALPASSWORD) showLoginModal()
+        }
+    )
+    .catch(() => showLoginModal());
+}
+
 function showLoginModal() {
     // The login modal is used both for authenicating against an OpenEDC Server and for getting the local decryption password
     $("#login-title").textContent = languageHelper.getTranslation("please-login");
@@ -194,7 +237,7 @@ function showLoginModal() {
             const credentials = new ioHelper.Credentials(username, password);
             ioHelper.loginToServer(credentials)
                 .then(() => loginSuccessful())
-                .catch(error => loginNotSuccessful(error));
+                .catch(error => {console.log(error); loginNotSuccessful(error)});
         } else {
             const credentials = new ioHelper.Credentials(username, password, confirmPassword);
             if (credentials.error) {
@@ -268,7 +311,7 @@ function adjustUIToUser() {
         $("#logout-button-name").textContent = admindataWrapper.getUserFullName(admindataWrapper.getCurrentUserOID());
     }
 
-    if (ioHelper.hasDecryptionKey()) $("#logout-button").show();
+    if (ioHelper.hasServerURL()) $("#logout-button").show();
 }
 
 function showUninitializedHint() {
@@ -381,14 +424,31 @@ window.hideExportModal = function() {
 }
 
 window.showProjectModal = function() {
-    if (ioHelper.hasDecryptionKey()) {
+    const disabledEncryption = ioHelper.getSetting("disableEncryption");
+    const isPublic = ioHelper.getSetting("instancePublic");
+    if (ioHelper.hasDecryptionKey() || ioHelper.hasServerURL()) {
         $("#project-modal #encryption-password-input").parentNode.parentNode.hide();
         $("#project-modal #data-encryption-warning").hide();
-        $("#project-modal #data-encrypted-hint").show();
+        $(`#project-modal #data-${disabledEncryption ? 'not-' : ''}encrypted-hint`).show();
     }
     if (ioHelper.hasServerURL()) {
         $("#project-modal #server-url-input").parentNode.parentNode.hide();
+        $("#project-modal #server-connect-no-encryption").parentNode.hide();
         $("#project-modal #server-connected-hint").show();
+        $("#project-modal #instance-public").parentNode.parentNode.show();
+        $("#encryption-hint-local").hide();
+    }
+
+    if(disabledEncryption || !ioHelper.hasServerURL()) {
+        $('#deactivate-encryption-button').parentNode.hide(); 
+    }
+
+    if(disabledEncryption) {
+        $('#instance-public').parentNode.show();
+    }
+
+    if(isPublic) {
+        $('#secret-key-setting').show();
     }
 
     const subjectKeyModeRadio = $(`#${ioHelper.getSetting("subjectKeyMode")}`);
@@ -396,6 +456,10 @@ window.showProjectModal = function() {
 
     $("#survey-code-input").value = ioHelper.getSetting("surveyCode");
     $("#show-as-likert").checked = ioHelper.getSetting("showLikertScale");
+    $("#likert-scale-limit-input").value = ioHelper.getSetting("likertScaleLimit")??'';
+    $("#force-checkboxes").checked = ioHelper.getSetting("forceCheckboxes");
+    $("#use-alternate-select").checked = ioHelper.getSetting("useAlternateSelect");
+    $("#use-textfield-for-date").checked = ioHelper.getSetting("useTextFieldForDate");
     $("#show-element-name").checked = ioHelper.getSetting("showElementName");
     $("#text-as-textarea-checkbox").checked = ioHelper.getSetting("textAsTextarea");
     $("#auto-survey-view-checkbox").checked = ioHelper.getSetting("autoSurveyView");
@@ -404,6 +468,8 @@ window.showProjectModal = function() {
     $("#study-description-textarea").value = metadataWrapper.getStudyDescription();
     $("#protocol-name-input").value = metadataWrapper.getProtocolName();
     $("#new-version-info").innerText = "";
+    $("#instance-public").checked = ioHelper.getSetting("instancePublic");
+    $("#force-mandatory-items-checkbox").checked = ioHelper.getSetting("forceMandatoryItems");
     admindataModule.loadUsers();
     admindataModule.loadSites();
 
@@ -465,7 +531,7 @@ window.connectToServer = function() {
                 case ioHelper.serverStatus.SERVERINITIALIZED:
                     ioHelper.showMessage(languageHelper.getTranslation("note"), languageHelper.getTranslation("server-initialized-hint"),
                         {
-                            [languageHelper.getTranslation("open-server")]: () => window.location.href = "https://" + serverURL
+                            [languageHelper.getTranslation("open-server")]: () => window.location.href = serverURL
                         }
                     );
             }
@@ -479,7 +545,9 @@ window.initializeServer = function(event) {
     const username = $("#owner-username-input").value;
     const password = $("#owner-password-input").value;
     const confirmPassword = $("#owner-confirm-password-input").value;
-    const credentials = new ioHelper.Credentials(username, password, confirmPassword);
+    const ownerProtected = $("#owner-protected-input").checked;
+    const credentials = new ioHelper.Credentials(username, password, confirmPassword, ownerProtected);
+    const disableEncryption = $("#server-connect-no-encryption").checked;
     if (credentials.error) {
         // TODO: This could be improved in the future -- passing the error to the languageHelper is not very nice
         ioHelper.showMessage(languageHelper.getTranslation("password-not-set"), languageHelper.getTranslation(credentials.error));
@@ -491,7 +559,7 @@ window.initializeServer = function(event) {
     const serverURL = $("#server-url-input").value;
     const userOID = admindataWrapper.getCurrentUserOID();
     event.target.showLoading();
-    ioHelper.initializeServer(serverURL, userOID, credentials)
+    ioHelper.initializeServer(serverURL, userOID, credentials, disableEncryption)
         .then(serverURL => window.location.replace(serverURL))
         .catch(() => event.target.hideLoading());
 }
@@ -518,6 +586,29 @@ window.encryptData = function(event) {
         .catch(() => event.target.hideLoading());
 }
 
+window.showDeactivateEncryptionDialog = () => {
+    ioHelper.showMessage(languageHelper.getTranslation('deactivate-encryption'), languageHelper.getTranslation('deactivate-encryption-hint'), 
+    {
+        [languageHelper.getTranslation('deactivate')] : () => deactivateEncryption()
+    })
+}
+
+const deactivateEncryption = async () => {
+    
+    await clinicaldataWrapper.deactivateEncryptionForSubjects();
+    console.log("clinicaldata stored");
+    await ioHelper.deactivateServerEncryption();
+    await metadataWrapper.storeMetadata();
+    console.log("metadata stored");
+    await admindataWrapper.storeAdmindata();
+    console.log("admindata stored");
+    ioHelper.showToast(languageHelper.getTranslation('deactivate-encryption-successful'))
+    $('#deactivate-encryption-button').parentNode.hide(); 
+    $(`#project-modal #data-encrypted-hint`).hide();
+    $(`#project-modal #data-not-encrypted-hint`).show();
+
+}
+
 window.setSurveyCode = function() {
     const surveyCode = $("#survey-code-input").value;
     if (surveyCode.length == 0 || (parseInt(surveyCode) == surveyCode && surveyCode.length == 4)) {
@@ -525,6 +616,17 @@ window.setSurveyCode = function() {
         hideProjectModal();
     } else {
         ioHelper.showMessage(languageHelper.getTranslation("error"), languageHelper.getTranslation("survey-code-error"));
+    }
+}
+
+window.setLikertScaleLimit = function() {
+    const limit = $("#likert-scale-limit-input").value;
+    if (limit.length == 0 || parseInt(limit) == limit) {
+        ioHelper.setSetting("likertScaleLimit", limit);
+        ioHelper.showToast(languageHelper.getTranslation('forms-saved-hint'), 4000, ioHelper.interactionTypes.SUCCESS);
+        reloadApp();
+    } else {
+        ioHelper.showMessage(languageHelper.getTranslation("error"), languageHelper.getTranslation("likert-limit-error"));
     }
 }
 
@@ -537,6 +639,15 @@ window.miscOptionClicked = async function(event) {
         case "show-as-likert":
             await ioHelper.setSetting("showLikertScale", event.target.checked);
             break;
+        case "force-checkboxes":
+            await ioHelper.setSetting("forceCheckboxes", event.target.checked);
+            break;
+        case "use-alternate-select":
+            await ioHelper.setSetting("useAlternateSelect", event.target.checked);
+            break;
+        case "use-textfield-for-date":
+            await ioHelper.setSetting("useTextFieldForDate", event.target.checked);
+            break;
         case "text-as-textarea-checkbox":
             await ioHelper.setSetting("textAsTextarea", event.target.checked);
             break;
@@ -546,6 +657,14 @@ window.miscOptionClicked = async function(event) {
         case "check-new-version-automatically":
             await ioHelper.setSetting("autoUpdates", event.target.checked);
             setOrStopCheckInterval(event.target.checked);
+            break;
+        case "instance-public":
+            await ioHelper.setSetting("instancePublic", event.target.checked);
+            if(event.target.checked) $('#secret-key-setting').show();
+            else $('#secret-key-setting').hide();
+            break;
+        case "force-mandatory-items-checkbox":
+            await ioHelper.setSetting("forceMandatoryItems", event.target.checked);
             break;
     }
 
@@ -591,7 +710,9 @@ window.showRemoveDataModal = function(complete) {
 
 window.showLogoutMessage = function() {
     ioHelper.showMessage(languageHelper.getTranslation("logout"), languageHelper.getTranslation("logout-question"), {
-        [languageHelper.getTranslation("logout")]: () => window.location.reload()
+        [languageHelper.getTranslation("logout")]: () => {
+            ioHelper.logout();
+        }
     });
 }
 
@@ -639,7 +760,7 @@ window.exportCSVZip = async function() {
 }
 
 async function checkDownloadIsAllowed() {
-    const isAllowed = await ioHelper.userHasRight(ioHelper.userRights.EXPORTDATA);
+    const isAllowed = ioHelper.userHasRight(ioHelper.userRights.EXPORTDATA);
     if(!isAllowed) {
         ioHelper.showToast(languageHelper.getTranslation('export-not-allowed'), 4000, ioHelper.interactionTypes.DANGER);
         return false;
@@ -649,6 +770,7 @@ async function checkDownloadIsAllowed() {
 
 window.removeAllData = async function() {
     if (ioHelper.hasServerURL()) {
+        await ioHelper.sendProjectDeletionInfo();
         await clinicaldataWrapper.removeClinicaldata();
         await metadataWrapper.loadEmptyProject();
     } else {
@@ -659,8 +781,17 @@ window.removeAllData = async function() {
 }
 
 window.removeClinicaldata = async function() {
+    if(ioHelper.hasServerURL()) {
+        await ioHelper.sendClinicalDataDeletionInfo();
+    }
     await clinicaldataWrapper.removeClinicaldata();
     window.location.reload();
+}
+
+window.setServerSecretKey = async () => {
+    const surveyCode = $("#server-secret-key").value;
+    ioHelper.setSetting("secretKey", surveyCode);
+    ioHelper.showToast(languageHelper.getTranslation("key-saved"), 4000, ioHelper.interactionTypes.SUCCESS);
 }
 
 // IO or event listeners that are valid for the entire app and cannot be assigned to either the metadatamodule or clinicaldatamodule
@@ -690,11 +821,14 @@ export function setIOListeners() {
 
 export function enableMode(mode) {
     if (clinicaldataModule.safeCloseClinicaldata(() => enableMode(mode))) return;
+    if(currentAppMode === appModes.METADATA && ioHelper.hasServerURL() && metadataModule.dataChanged(() => enableMode(mode))) return;
 
     $("#metadata-section").hide();
     $("#clinicaldata-section").hide();
     $("#reports-section").hide();
-    $("#metadata-mode-button").show();
+    if (!ioHelper.hasServerURL() || ioHelper.userHasRight(ioHelper.userRights.EDITMETADATA)) {
+        $("#metadata-mode-button").show();
+    }
     $("#clinicaldata-mode-button").show();
     $("#reports-mode-button").show();
 
@@ -725,7 +859,7 @@ export function enableMode(mode) {
             clinicaldataModule.adjustMobileUI(true);
             reportsModule.show();
     }
-
+    currentAppMode = mode;
     ioHelper.hideMenu();
     ioHelper.dispatchGlobalEvent("ModeEnabled", mode);
 }
@@ -755,12 +889,15 @@ window.checkForNewVersion = async () => {
 async function attachUpdateListenerToServiceWorker() {
     if(window.navigator.serviceWorker) {
         window.navigator.serviceWorker.addEventListener('message', event => {
+            console.log("service worker reload");
             window.location.reload();
         })
     }
 }
 
 window.updateToNewVersion = async() => {
+    console.log("update");
+    console.log(window.navigator.serviceWorker);
     if(window.navigator.serviceWorker) {
         window.navigator.serviceWorker.ready.then(registration => registration.active.postMessage('Hi there'))
     }
@@ -841,7 +978,7 @@ async function setCheckForNewNotifications(){
                 $(`#${badgeId}`).innerText = 0;
             }
         }
-    }, 5000);
+    }, 10000);
 }
 
 window.showNotifications = async(e) => {
@@ -897,7 +1034,7 @@ function closeNotificationsClickHandler(e) {
     }
 } 
 
-async function handleURLSearchParameters() {
+async function handleURLSearchParameters(forceNew = false) {
     const urlParams = new URLSearchParams(window.location.search);
     if (!urlParams.toString()) {
         resetTokens();
@@ -910,7 +1047,7 @@ async function handleURLSearchParameters() {
         .then(models => {
             if (!models) return;
              
-            if (getCurrentState() == appStates.EMPTY) mergeMetadataModels(models);
+            if (getCurrentState() == appStates.EMPTY || forceNew) mergeMetadataModels(models);
             else if (getCurrentState() == appStates.UNLOCKED) {
                 ioHelper.showMessage(languageHelper.getTranslation("import-forms"), languageHelper.getTranslation("import-forms-merge-hint"),
                     {
@@ -926,6 +1063,9 @@ async function handleURLSearchParameters() {
         })
         .catch(error => ioHelper.showMessage(languageHelper.getTranslation("Error"), languageHelper.getTranslation("forms-import-error")));
     repositoryHelper.preloadPage(urlParams);
+    repositoryHelper.preloadPatient(urlParams)
+    document.dispatchEvent(new CustomEvent("SurveyViewShown"));
+
     window.history.replaceState(null, appVersion, ioHelper.getBaseURL());
 }
 
@@ -1023,6 +1163,8 @@ function getCurrentState() {
 }
 
 function resetTokens() {
-    sessionStorage.removeItem("mdmUserToken");
-    sessionStorage.removeItem("predecessorModelId");
+    if(sessionStorage) {
+        sessionStorage.removeItem("mdmUserToken");
+        sessionStorage.removeItem("predecessorModelId");
+    }
 }

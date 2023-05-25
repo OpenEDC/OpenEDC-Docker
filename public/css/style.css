@@ -1,7 +1,8 @@
+
 :root {
-    --link-color: #3273dc;
-    --link-hover-color: #276cda;
-    --link-active-color: #3a51bb;
+    --link-color: #004a6f;
+    --link-hover-color: #00334d;
+    --link-active-color: #00334d;
     --link-light-color: #eef3fc;
     --link-light-hover-color: #e3ecfa;
     --link-light-active-color: #d8e4f8;
@@ -10,6 +11,86 @@
     --gray-lighter-color: #ededed;
     --gray-lightest-color: #f5f5f5;
     --dark-color: #363636;
+}
+
+.panel.is-link .panel-heading {
+    background-color: var(--link-color);
+}
+
+.button.is-link {
+    background-color: var(--link-color);
+}
+
+.button.is-link:hover {
+    background-color: var(--link-hover-color);
+}
+
+.button.is-link.is-light {
+    color: var(--link-color);
+}
+
+.button.is-link.is-light.is-hovered, .button.is-link.is-light:hover {
+    color: var(--link-hover-color);
+}
+
+.button.is-link[disabled], fieldset[disabled] .button.is-link {
+    background-color: var(--link-color);
+}
+
+.button.is-link.is-outlined {
+    border-color: var(--link-color);
+    color: var(--link-color);
+}
+
+.button.is-link.is-outlined.is-focused, .button.is-link.is-outlined.is-hovered, .button.is-link.is-outlined:focus, .button.is-link.is-outlined:hover {
+    border-color: var(--link-hover-color);
+    background-color: var(--link-hover-color);
+}
+
+.button.is-link.is-light {
+    background-color: #eff1fa;
+}
+
+.has-text-link {
+    color: var(--link-color) !important;
+}
+
+.notification.is-link.is-light {
+    color: var(--link-color);
+}
+
+.tabs li.is-active a {
+    border-bottom-color: var(--link-color);
+    color: var(--link-color);
+}
+
+.navbar-link.is-active, .navbar-link:focus, .navbar-link:focus-within, .navbar-link:hover, a.navbar-item.is-active, a.navbar-item:focus, a.navbar-item:focus-within, a.navbar-item:hover {
+    color: var(--link-color)
+}
+
+.input:active, .input:focus, .is-active.input, .is-active.textarea, .is-focused.input, .is-focused.textarea, .select select.is-active, .select select.is-focused, .select select:active, .select select:focus, .textarea:active, .textarea:focus {
+    border-color: var(--link-active-color);
+}
+
+.select:not(.is-multiple):not(.is-loading)::after {
+    border-color: var(--link-color);
+}
+
+.has-background-link {
+    background-color: var(--link-color) !important;
+}
+
+option:hover {
+    background-color: var(--link-color) !important;
+    color: red
+}
+
+.navbar-link:not(.is-arrowless)::after {
+    border-color: var(--link-color);
+}
+
+[type="checkbox"], [type="radio"] {
+    accent-color: var(--link-color);
 }
 
 html {
@@ -173,8 +254,10 @@ a.panel-block {
     overflow-y: auto;
 }
 
-#translation-textarea {
+#translation-textarea, #translation-textarea-formatted {
     min-height: 5rem;
+    max-width: 200px;
+    overflow-y: auto;
 }
 
 #extended-options-button {
@@ -420,6 +503,10 @@ a.panel-block:hover {
     background-color: white;
 }
 
+.expanded {
+    height: 300px;
+}
+
 .control.has-autocomplete-top .autocomplete-list {
     bottom: 120%;
 }
@@ -543,7 +630,9 @@ a.panel-block:hover {
 }
 
 .has-overvlow-wrap  {
-    word-break: break-all;
+    /*overflow-wrap: anywhere;*/
+    overflow-wrap: break-word;
+    -webkit-line-break: after-white-space;
 }
 
 .has-text-align-center {
@@ -612,6 +701,11 @@ div.has-hover:active {
     display: none;
 }
 
+ul.bullet-list {
+    list-style: inside;
+    margin-left: 10px
+}
+
 .no-bullets {
     list-style-type: none;
     margin: 0;
@@ -646,6 +740,27 @@ div.has-hover:active {
     top: 0;
     right: 0;
   }
+
+  .event-disabled {
+    color: lightgray;
+    pointer-events: none;
+  }
+
+.is-fullwidth {
+    width: 100%;
+}
+
+.has-focus-none:focus {
+    box-shadow: none !important;
+}
+
+.is-sticky-header {
+    position: sticky;
+    top: 0;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+    background-color: #f5f5f5;
+    z-index: 2;
+}
 
 @media only screen and (max-width: 1024px) {
     #app-mode-button .dropdown-menu {
@@ -708,3 +823,21 @@ div.has-hover:active {
         width: 100%;
     }
 }
+
+@keyframes glowing {
+    0% {
+      background-color: #FF3366;
+      box-shadow: 0 0 5px #FF3366;
+    }
+    50% {
+      background-color: #ff0342;
+      box-shadow: 0 0 20px #ff0342;
+    }
+    100% {
+      background-color: #FF3366;
+      box-shadow: 0 0 5px #FF3366;
+    }
+  }
+  .button-glowing {
+    animation: glowing 1300ms infinite;
+  }

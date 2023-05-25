@@ -11,7 +11,7 @@ export const getCSVString = async () => {
 
     // Then, add the subject column as well as the creation date and add the item names as headers to the CSV string
     csvString += "Subject,RepeatKey,Creation_Date,Creation_Time,";
-    csvString += itemPaths.map(path => metadataWrapper.getElementDefByOID(path.itemOID).getName()).join(",") + "\n";
+    csvString += itemPaths.map(path => formatValue(metadataWrapper.getElementDefByOID(path.itemOID).getName())).join(",") + "\n";
 
     // Second, add the creation date and clinical data for each subject
     for (let [key, value] of Object.entries(subjectData)) {
@@ -60,7 +60,7 @@ export const getSeparatedCSVFiles = async () => {
         let csvString = ",,,,";
         csvString += itemPaths.map(path => path.toString().replace(/,/g, "")).join(",") + "\n";
         csvString += `Subject,RepeatKey,Creation_Date,Creation_Time,`;
-        csvString += itemPaths.map(path => metadataWrapper.getElementDefByOID(path.itemOID).getName()).join(",") + "\n";
+        csvString += itemPaths.map(path => formatValue(metadataWrapper.getElementDefByOID(path.itemOID).getName())).join(",") + "\n";
 
         for await (let [key, value] of Object.entries(subjectData)) {
             let repeatableEventsCounts = 1;

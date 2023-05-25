@@ -9,12 +9,14 @@ export const init = (instance, odmId) => {
     // Set file storage directories
     const root = instance ? "./data_" + instance : "./data";
     directories = {
+        CONFIG: "./config/",
         ROOT: root + "/",
         METADATA: root + "/metadata/",
         ADMINDATA: root + "/admindata/",
         CLINICALDATA: root + "/clinicaldata/",
         MISC: root + "/misc/",
-        ARCHIVE: root + "/archive/"
+        ARCHIVE: root + "/archive/",
+        LOGS: root + "/logs/"
     }
 
     // Ensures that all directories exist
@@ -61,6 +63,10 @@ export const loadXML = (directory, fileName) => {
     return Deno.readTextFileSync(directory + fileName);
 }
 
+export const storeLog = async (fileName, text, createNew = false) => {
+    Deno.writeTextFileSync(directories.LOGS + fileName, `${text}\n`, {append: !createNew})
+}
+
 export const removeFile = (directory, fileName) => {
     try {
         Deno.renameSync(directory + fileName, directories.ARCHIVE + fileName);
@@ -95,6 +101,12 @@ export function getAdmindataModifiedFromFileName(fileName) {
 export function getClinicaldataModifiedFromFileName(fileName) {
     const fileNameParts = fileName.split(fileNameSeparator);
     return parseInt(fileNameParts[3]) || null;
+}
+
+export function getSetting(identifier) {
+    let settings = JSON.parse(Deno.readTextFileSync(directories.MISC + "settings"));
+    settings = JSON.parse(settings);
+    return settings[identifier];
 }
 
 async function loadFromMDMPortal(odmId) {

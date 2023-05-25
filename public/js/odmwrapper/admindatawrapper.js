@@ -83,7 +83,7 @@ export function getUser(userOID) {
 
 export function getUserFullName(userOID) {
     const user = getUser(userOID);
-    return user.querySelector("FirstName").textContent + " " + user.querySelector("LastName").textContent;
+    return (user?.querySelector("FirstName").textContent + " " + user?.querySelector("LastName").textContent);
 }
 
 export function getCurrentUserOID() {

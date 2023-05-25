@@ -1,5 +1,7 @@
 import ODMPath from "../odmwrapper/odmpath.js";
 import { Parser } from "../../lib/expr-eval.js";
+import * as metadataWrapper from "../odmwrapper/metadatawrapper.js"
+import { isSet }  from "./parserfunctions.js"
 
 const $ = query => document.querySelector(query);
 const $$ = query => document.querySelectorAll(query);
@@ -50,9 +52,17 @@ export function parse(formalExpression, referencePath) {
 }
 
 export function evaluate(expression, expressionType) {
+    let variables;
+    if (expressionType == "condition") variables = conditionVariables;
+    else if (expressionType == "method") variables = methodVariables;
+    
     try {
-        if (expressionType == "condition") return expression.evaluate(conditionVariables);
-        else if (expressionType == "method") return expression.evaluate(methodVariables);
+        expression.tokens.filter(token => token.type == "IVAR").map(token => token.value).forEach(token => {
+            if(Object.keys(expression.functions).indexOf(token) < 0) {
+                variables[token] = variables[token] || null;
+            }
+        });
+        return expression.evaluate(variables);
     } catch (error) {
         // Error while evaluating the expressions
     }
@@ -60,14 +70,24 @@ export function evaluate(expression, expressionType) {
 
 function getParser() {
     if (!parser) parser = new Parser( { operators: { assignment: false } } );
+    parser.functions.isSet = isSet;
     return parser;
 }
 
 function processCondition(condition) {
     // Select conditional item group or item and hide it
     let conditionalElement;
-    if (condition.elementType == "itemgroup") conditionalElement = $(`#clinicaldata-content [item-group-content-oid="${condition.elementPath.itemGroupOID}"]`);
-    else if (condition.elementType == "item") conditionalElement = $(`#clinicaldata-content [item-field-oid="${condition.elementPath.itemOID}"]`);
+    switch(condition.elementType) {
+        case ODMPath.elements.FORM:
+            conditionalElement = $(`#odm-html-content`);
+            break;
+        case ODMPath.elements.ITEMGROUP: 
+            conditionalElement = $(`#clinicaldata-content [item-group-content-oid="${condition.elementPath.itemGroupOID}"]`);
+            break;
+        case ODMPath.elements.ITEM:
+            conditionalElement = $(`#clinicaldata-content [item-field-oid="${condition.elementPath.itemOID}"]`);
+            break;
+    }
     conditionalElement.hide();
 
     // If the expression evaluates to true, show condition element
@@ -134,7 +154,8 @@ function processMethod(method) {
     computedElement.readOnly = true;
 
     // If a value can already be calculated, assign it
-    computedElement.value = computeMethod(method);
+    computedElement.value = computeMethod(method, method.elementPath.itemOID);
+    if(computedElement.value) setVariable(method.elementPath.toString(), computedElement.value);
 
     // Add event listeners to respond to inputs to the determinant items
     for (const variable of method.expression.variables()) {
@@ -154,15 +175,23 @@ function processMethod(method) {
 
 function respondToInputChangeMethod(input, itemPath, method, computedElement) {
     setVariable(itemPath.toString(), input.value ? input.value.replace(",", ".") : null);
-
-    computedElement.value = computeMethod(method);
+    computedElement.value = computeMethod(method, computedElement.getAttribute('item-oid'));
+    if(computedElement.value) setVariable(method.elementPath.toString(), computedElement.value);
+    //if(computedElement.value) setVariable(method.elementPath, computedElement.value);
     computedElement.dispatchEvent(new Event("input"));
 }
 
-function computeMethod(method) {
+function computeMethod(method, elementOID) {
     const computedValue = evaluate(method.expression, method.expressionType);
+    if(typeof computedValue === 'undefined' || computedValue === null) return null;
+
+    const element = metadataWrapper.getElementDefByOID(elementOID)
+    if(element.getAttribute('DataType') == 'text' || element.getAttribute('DataType') == 'string') {
+        return computedValue;
+    }
     return !isNaN(computedValue) && isFinite(computedValue) ? Math.round(computedValue * 100) / 100 : null;
 }
+
 
 // Helper functions
 function normalizeTokens(expression) {
@@ -184,12 +213,28 @@ export function unescapeOIDDots(expression) {
     return expression.replace(/([a-zA-Z][a-zA-Z0-9]*)__([a-zA-Z0-9\.]+)/g, "$1.$2");
 }
 
+// TODO: Does currently not work with decimal numbers (point will be replaced with underscores, previous regexp: ([a-zA-Z][a-zA-Z0-9]*)\.([a-zA-Z0-9\.]+))
 export function escapePaths(expression) {
-    return expression.replace(/-/g, "____").replace(/(\w)\.(?=\w)/g, "$1__");
+    let noChange = false;
+    let placeHolderString = expression//.replace(/__/g, "###").replace(/-/g, "____");
+    while(!noChange) {
+        expression = placeHolderString;
+        placeHolderString = expression.replace(/([a-zA-Z0-9_.-])-([a-zA-Z0-9_.-])/g, "$1____$2").replace(/([a-zA-Z]\w*?)\.(?=\w)/g, "$1__");
+        if(expression === placeHolderString) noChange = true;
+    }
+    return placeHolderString;
 }
 
 export function unescapePaths(expression) {
-    return expression.replace(/____/g, "-").replace(/(\w)__(?=\w)/g, "$1.");
+    let noChange = false;
+    let placeHolderString = expression;
+    while(!noChange) {
+        expression = placeHolderString;
+        placeHolderString = expression.replace(/____/g, "-").replace(/([a-zA-Z]\w*?)__(?=\w)/g, "$1.");
+        if(expression === placeHolderString) noChange = true;
+    }
+    return placeHolderString//.replace(/###/g, "__").replace(/____/g, "-");
+    //return expression.replace(/____/g, "-").replace(/(\w+)__(?=\w)/g, "$1.");
 }
 
 export function escapeEmptySpaces(expression) {
@@ -199,5 +244,7 @@ export function escapeEmptySpaces(expression) {
 export function unescapeEmptySpaces(expression) {
     return expression.replace(/__/g, " ").replace(/(\w)__(?=\w)/g, "$1 ");
 }
+
+
 
 

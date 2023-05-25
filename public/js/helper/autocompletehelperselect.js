@@ -21,7 +21,8 @@ class AutocompleteElement {
 export const modes = {
     ITEMWITHCODELIST: 1,
     ITEM: 2,
-    CODELIST: 3
+    CODELIST: 3,
+    CUSTOM: 4
 }
 
 let currentMode;
@@ -29,11 +30,15 @@ let currentInput;
 let currentValue;
 let elements;
 let installedFilters;
+let customOptions;
+let callbackFunction;
 
-export const enableAutocomplete = (input, mode, filters) => {
+export const enableAutocomplete = (input, mode, filters, options = [], callback = undefined) => {
     // Set the mode to later adjust the input parts
     input.setAttribute("autocomplete-mode", mode);
     installedFilters = filters;
+    customOptions = options;
+    callbackFunction = callback;
 
     // Start autocomplete when element gets focus
     // TODO: Check if all listeners are really required -- use input within keydown/keyup?
@@ -116,9 +121,9 @@ const setCurrentPartAndInput = input => {
 
 const elementSelected = element => {
 
-    currentInput.value = element["_label"];
+    currentInput.value = element["_label"]??element["_value"];
     currentInput.setAttribute("data-value",element["_value"].codeListItem);
-
+    if(callbackFunction) callbackFunction(element["_value"]);
     closeLists();
 }
 
@@ -152,6 +157,10 @@ const getElements = () => {
         case modes.ITEMWITHCODELIST:
             items = metadataWrapper.getItemPaths({ withCodeList: true });
             break;
+        case modes.CUSTOM: 
+            return customOptions.map(item => new AutocompleteElement(
+                item.value,item.label
+            ));
         
     }
 

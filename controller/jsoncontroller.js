@@ -1,27 +1,34 @@
 import * as storageHelper from "./helper/storagehelper.js";
+import * as loggingController from "./loggingcontroller.js"
 
 export const getJSON = async context => {
     const fileName = context.params.fileName;
     const content = storageHelper.loadJSON(storageHelper.directories.MISC, fileName);
-
     if (content) {
-        return context.json(content, 200);
+        context.response.status = 200;
+        context.response.body = content;
     } else {
-        return context.string("JSON could not be found.", 204);
+        context.response.status = 204;
     }
 };
 
-export const setJSON = async context => {
+export const setJSON = async (context, user) => {
     const fileName = context.params.fileName;
-    const content = await context.body;
+    const content = await context.request.body().value;
 
     storageHelper.storeJSON(storageHelper.directories.MISC, fileName, content);
-    return context.string("JSON successfully stored.", 201);
+
+    loggingController.log([loggingController.LogEvent.JSON_AND_SETTINGS], `${user.username}: Changed json entry ${fileName}`);
+    context.response.status = 201;
+    context.response.body = "JSON successfully stored.";
 };
 
-export const deleteJSON = async context => {
+export const deleteJSON = async (context, user) => {
     const fileName = context.params.fileName;
 
     storageHelper.removeFile(storageHelper.directories.MISC, fileName);
-    return context.string("JSON successfully deleted.", 201);
+
+    loggingController.log([loggingController.LogEvent.JSON_AND_SETTINGS], `${user.username}: Deleted json entry ${fileName}`);
+    context.response.status = 201;
+    context.response.body = "JSON successfully deleted.";
 };

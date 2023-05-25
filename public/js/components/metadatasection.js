@@ -6,6 +6,10 @@ class MetadataSection extends HTMLElement {
                     <h1 class="title is-4" i18n="mobile-metadata"></h1>
                     <p i18n="mobile-metadata-hint"></p>
                 </div>
+                <div class="notification is-danger is-light is-hidden is-flex is-justify-content-space-between is-align-items-center p-2" id="store-metadata-async-button-notification">
+                    <p i18n="store-metadata-hint"></p>
+                    <button class="button is-danger" id="store-metadata-async-button" onclick="storeMetadataAsync()" i18n="save-forms"></button>
+                </div>
                 <div class="columns is-desktop is-centered" id="details-panel">
                     <div class="column is-half-desktop">
                         <div class="box has-sidebar">
@@ -53,8 +57,23 @@ class MetadataSection extends HTMLElement {
                                             <input class="input" type="text" id="name-input" autocomplete="off">
                                         </div>
                                         <div class="field is-flex is-flex-direction-column is-flex-grow-1">
-                                            <label class="label" id="element-long-label"></label>
-                                            <textarea class="textarea is-flex-grow-1" id="translation-textarea"></textarea>
+                                            <div class="is-flex is-justify-content-space-between">
+                                                <label class="label" id="element-long-label"></label>
+                                                <div class="tabs is-small mb-0" id="translation-area-tabs">
+                                                    <ul>
+                                                        <li id="translation-textarea-link" class="is-active"><a onclick="switchTab(event, 'translation-textarea-formatted-container', 'translation-textarea-container', false)" i18n="raw"></a></li>
+                                                        <li id="translation-textarea-formatted-link"><a onclick="switchTab(event, 'translation-textarea-container', 'translation-textarea-formatted-container', true)" i18n="formatted"></a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div id='translation-text-sections-container' class="is-flex-grow-1 is-flex">
+                                                <section class="tab-content is-flex-grow-1 is-flex is-flex-direction-column is-hidden" id="translation-textarea-container">
+                                                    <textarea class="textarea is-flex-grow-1" id="translation-textarea" contenteditable="true"></textarea>
+                                                </section>
+                                                <section class="tab-content is-flex-grow-1 is-flex is-flex-direction-column" id="translation-textarea-formatted-container">
+                                                    <div class="textarea is-flex-grow-1" id="translation-textarea-formatted" contenteditable="true"></div>
+                                                </section>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -80,7 +99,22 @@ class MetadataSection extends HTMLElement {
                                         </div>
                                         <div class="field">
                                             <label class="label is-inline-block" i18n="alias-names"></label>
-                                            <a class="button is-small is-link is-pulled-right" i18n="edit-settings" onclick="showSettingsEditor()"></a>
+                                            <div class="dropdown is-hoverable is-pulled-right">
+                                                <div class="dropdown-trigger">
+                                                    <button class="button is-small is-link" aria-haspopup="true" aria-controls="alias-dropdown-menu">
+                                                    <span i18n="options"></span>
+                                                    <span class="icon is-small">
+                                                        <i class="fas fa-angle-down" aria-hidden="true"></i>
+                                                    </span>
+                                                    </button>
+                                                </div>
+                                                <div class="dropdown-menu" id="alias-dropdown-menu" role="menu">
+                                                    <div class="dropdown-content" id="alias-dropdown-menu-content">
+                                                    <a class="dropdown-item" i18n="edit-settings" onclick="showSettingsEditor()"></a>
+                                                    <a class="dropdown-item" i18n="external-links" onclick="showExternalLinksEditor()"></a>
+                                                </div>
+                                                </div>
+                                            </div>
                                             <div id="alias-inputs"></div>
                                             <button class="button is-small is-pulled-right mt-2" id="add-alias-button" onclick="addEmptyAliasInput()" i18n="add"></button>
                                         </div>
@@ -131,8 +165,8 @@ class MetadataSection extends HTMLElement {
                         </div>
                     </div>
                 </div>
-                <div class="columns is-desktop">
-                    <div class="column">
+                <div class="columns is-desktop mb-0">
+                    <div class="column pb-0">
                         <nav class="panel is-link">
                             <p class="panel-heading has-text-centered" i18n="events"></p>
                             <div class="tree-panel-blocks" id="study-event-panel-blocks" ondragenter="allowDrop(event)" ondragover="allowDrop(event)" ondrop="elementDrop(event)"></div>
@@ -141,7 +175,7 @@ class MetadataSection extends HTMLElement {
                             </div>
                         </nav>
                     </div>
-                    <div class="column">
+                    <div class="column pb-0">
                         <nav class="panel is-link">
                             <p class="panel-heading has-text-centered" i18n="forms"></p>
                             <div class="tree-panel-blocks" id="form-panel-blocks" ondragenter="allowDrop(event)" ondragover="allowDrop(event)" ondrop="elementDrop(event)"></div>
@@ -150,7 +184,7 @@ class MetadataSection extends HTMLElement {
                             </div>
                         </nav>
                     </div>
-                    <div class="column">
+                    <div class="column is-clipped pb-0">
                         <nav class="panel is-link">
                             <p class="panel-heading has-text-centered" i18n="groups"></p>
                             <div class="tree-panel-blocks" id="item-group-panel-blocks" ondragenter="allowDrop(event)" ondragover="allowDrop(event)" ondrop="elementDrop(event)"></div>
@@ -159,7 +193,7 @@ class MetadataSection extends HTMLElement {
                             </div>
                         </nav>
                     </div>
-                    <div class="column">
+                    <div class="column is-clipped pb-0">
                         <nav class="panel is-link">
                             <p class="panel-heading has-text-centered" i18n="items"></p>
                             <div class="tree-panel-blocks" id="item-panel-blocks" ondragenter="allowDrop(event)" ondragover="allowDrop(event)" ondrop="elementDrop(event)"></div>
@@ -168,7 +202,7 @@ class MetadataSection extends HTMLElement {
                             </div>
                         </nav>
                     </div>
-                    <div class="column">
+                    <div class="column is-clipped pb-0">
                         <nav class="panel is-link">
                             <p class="panel-heading has-text-centered" i18n="choices"></p>
                             <div class="tree-panel-blocks" id="code-list-item-panel-blocks" ondragenter="allowDrop(event)" ondragover="allowDrop(event)" ondrop="elementDrop(event)"></div>
@@ -188,6 +222,9 @@ class MetadataSection extends HTMLElement {
                             </div>
                         </nav>
                     </div>
+                </div>
+                <div class="is-hidden" id="image-preview-container" style="position: absolute; z-index:41;">
+                    <img src="" style="max-width:300px; max-height: 300px;"/>
                 </div>
             </section>
         `;

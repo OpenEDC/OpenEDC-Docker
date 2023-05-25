@@ -5,7 +5,14 @@ class ClinicaldataSection extends HTMLElement {
                 <div class="columns is-desktop">
                     <div class="column is-one-fifth-desktop" id="subjects-column">
                         <nav class="panel is-link">
-                            <p class="panel-heading has-text-centered" i18n="subjects"></p>
+                            <div class="panel-heading has-text-centered is-flex is-justify-content-center">
+                                <p i18n="subjects"></p>
+                                <button style="height: 25px" class="button is-link is-rounded is-small" onclick="reloadSubjectKeys()">
+                                    <span class="icon">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </span>
+                                </button>
+                            </div>
                             <div class="panel-block has-no-padding-bottom has-no-border-bottom subject-key-mode-element">
                                 <div class="field is-grouped is-fullwidth" id="subject-key-mode-manual-element">
                                     <div class="control is-expanded has-icons-left">
@@ -54,6 +61,15 @@ class ClinicaldataSection extends HTMLElement {
                                 </div>
                             </div>
                             <div class="panel-block has-no-padding-bottom has-no-border-bottom">
+                                <div class="field is-fullwidth">
+                                    <div class="control has-icons-left is-fullwidth" id="date-filter-subject-control">
+                                        <div class="icon">
+                                            <i class="fa-solid fa-filter"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-block has-no-padding-bottom has-no-border-bottom">
                                 <div class="control has-icons-left">
                                     <input class="input" id="search-subject-input" type="text" i18n-ph="search">
                                     <span class="icon is-left">
@@ -91,15 +107,15 @@ class ClinicaldataSection extends HTMLElement {
                                     <article class="message is-hidden" id="form-hint">
                                         <div class="message-body"></div>
                                     </article>
-                                    <nav class="level">
+                                    <nav class="level is-flex is-flex-direction-column">
                                         <div class="level-left" id="clinicaldata-form-title">
                                             <div class="level-item">
                                                 <h1 class="subtitle is-3"></h1>
                                             </div>
                                         </div>
-                                        <div class="level-right ml-5 is-hidden-survey-view" id="survey-view-button">
+                                        <div class="level-right mt-2 ml-5 is-hidden-survey-view is-flex is-justify-content-space-end is-fullwidth" id="survey-view-button">
                                             <div class="level-item">
-                                                <button class="button is-link is-light is-small" onclick="showSurveyView()">
+                                                <button class="button is-link is-light is-small" onclick="showSurveyView()" id="survey-button">
                                                     <span class="icon">
                                                         <i class="fa-solid fa-expand"></i>
                                                     </span>

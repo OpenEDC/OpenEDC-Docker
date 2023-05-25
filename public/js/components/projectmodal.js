@@ -22,7 +22,11 @@ class ProjectModal extends HTMLElement {
                                 <h1 class="title is-4" i18n="connect-to-server"></h1>
                                 <p class="has-text-weight-bold mb-5 is-hidden" id="server-connected-hint" i18n="connected-hint"></p>
                                 <p i18n="connection-hint"></p>
-                                <div class="field has-addons mt-5 mb-0">
+                                <label class="checkbox is-block mt-5">
+                                        <input type="checkbox" id="server-connect-no-encryption">
+                                        <span i18n="deactivate-encryption"></span>
+                                </label>
+                                <div class="field has-addons mt-2 mb-0">
                                     <div class="control is-expanded">
                                         <input class="input is-small" id="server-url-input" type="text" i18n-ph="server-url">
                                     </div>
@@ -34,15 +38,20 @@ class ProjectModal extends HTMLElement {
                                     <p class="has-text-weight-bold mt-5 mb-5" i18n="new-account-hint"></p>
                                     <input class="input is-small mb-3" id="owner-username-input" type="text" autocomplete="username" i18n-ph="username">
                                     <input class="input is-small mb-3" id="owner-password-input" type="password" autocomplete="new-password" i18n-ph="password">
-                                    <input class="input is-small mb-5" id="owner-confirm-password-input" type="password" autocomplete="new-password" i18n-ph="password-confirm">
+                                    <input class="input is-small mb-3" id="owner-confirm-password-input" type="password" autocomplete="new-password" i18n-ph="password-confirm">
+                                    <label class="checkbox is-block mb-5">
+                                        <input type="checkbox" id="owner-protected-input">
+                                        <span i18n="owner-protected-hint"></span>
+                                    </label>
                                     <button class="button is-link is-small" onclick="initializeServer(event)" i18n="create-user"></button>
                                 </form>
                             </div>
                             <div class="notification is-link is-light">
                                 <h1 class="title is-4" i18n="encrypt-data"></h1>
-                                <p class="has-text-weight-bold mb-5 is-hidden" id="data-encrypted-hint" i18n="enrypted-hint"></p>
-                                <p i18n="encryption-hint"></p>
-                                <p class="has-text-weight-bold mt-5" id="data-encryption-warning" i18n="encryption-warning"></p>
+                                <p class="has-text-weight-bold mb-5 is-hidden" id="data-encrypted-hint" i18n="encrypted-hint"></p>
+                                <p class="has-text-weight-bold mb-5 is-hidden" id="data-not-encrypted-hint" i18n="not-encrypted-hint"></p>
+                                <p class="mb-5" id="encryption-hint-local" i18n="encryption-hint"></p>
+                                <p class="has-text-weight-bold mb-5" id="data-encryption-warning" i18n="encryption-warning"></p>
                                 <form>
                                     <input class="is-hidden" autocomplete="username">
                                     <div class="field has-addons mt-5 mb-0">
@@ -62,6 +71,30 @@ class ProjectModal extends HTMLElement {
                                         </div>
                                     </div>
                                 </form>
+                                <div class="columns">
+                                    <button class="button is-link column p-1 is-small" onclick="showDeactivateEncryptionDialog()" i18n="deactivate-encryption"  id="deactivate-encryption-button"></button>
+                                </div>
+                            </div>
+                            <div class="notification is-link is-light is-hidden">
+                                <h1 class="title is-4" i18n="server-settings"></h1>
+                                <p class="mb-5" i18n="server-settings-hint"></p>
+                                <label class="checkbox is-block mb-5 is-hidden">
+                                    <input type="checkbox" id="instance-public" oninput="miscOptionClicked(event)">
+                                    <span i18n="make-instance-public-hint"></span>
+                                </label>
+                                <div class="is-hidden" id="secret-key-setting">
+                                    <label class="checkbox is-block mb-5">
+                                        <span i18n="server-secret-key-hint"></span>
+                                    </label>
+                                    <div class="field has-addons">
+                                        <div class="control is-expanded">
+                                            <input class="input is-small" id="server-secret-key" type="text" i18n-ph="server-secret-key">
+                                        </div>
+                                        <div class="control">
+                                            <a class="button is-link is-small" onclick="setServerSecretKey()" i18n="confirm"></a>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="notification is-link is-light">
                                 <h1 class="title is-4" i18n="subject-key"></h1>
@@ -105,6 +138,26 @@ class ProjectModal extends HTMLElement {
                                         <input type="checkbox" id="show-as-likert" oninput="miscOptionClicked(event)">
                                         <span i18n="show-as-likert-hint"></span>
                                     </label>
+                                    <div class="field has-addons">
+                                        <div class="control is-expanded">
+                                            <input class="input is-small" id="likert-scale-limit-input" type="text" i18n-ph="likert-scale-limit">
+                                        </div>
+                                        <div class="control">
+                                            <a class="button is-link is-small" onclick="setLikertScaleLimit()" i18n="confirm"></a>
+                                        </div>
+                                    </div>
+                                    <label class="checkbox is-block">
+                                        <input type="checkbox" id="force-checkboxes" oninput="miscOptionClicked(event)">
+                                        <span i18n="force-checkboxes-hint"></span>
+                                    </label>
+                                    <label class="checkbox is-block">
+                                        <input type="checkbox" id="use-alternate-select" oninput="miscOptionClicked(event)">
+                                        <span i18n="use-alternate-select-hint"></span>
+                                    </label>
+                                    <label class="checkbox is-block">
+                                        <input type="checkbox" id="use-textfield-for-date" oninput="miscOptionClicked(event)">
+                                        <span i18n="use-textfield-for-date-hint"></span>
+                                    </label>
                                     <label class="checkbox is-block">
                                         <input type="checkbox" id="text-as-textarea-checkbox" oninput="miscOptionClicked(event)">
                                         <span i18n="textarea-hint"></span>
@@ -112,6 +165,10 @@ class ProjectModal extends HTMLElement {
                                     <label class="checkbox is-block">
                                         <input type="checkbox" id="auto-survey-view-checkbox" oninput="miscOptionClicked(event)">
                                         <span i18n="survey-view-hint"></span>
+                                    </label>
+                                    <label class="checkbox is-block">
+                                        <input type="checkbox" id="force-mandatory-items-checkbox" oninput="miscOptionClicked(event)">
+                                        <span i18n="force-mandatory-items"></span>
                                     </label>
                                 </div>
                             </div>
@@ -130,9 +187,9 @@ class ProjectModal extends HTMLElement {
                                 <div class="columns is-centered is-multiline">
                                     <div class="column is-6 p-1">
                                         <div class="file" id="odm-import-metadata">
-                                            <label class="file-label">
+                                            <label class="file-label is-fullwidth">
                                                 <input class="file-input" type="file" accept=".xml,text/xml" onchange="importODMMetadata()" multiple>
-                                                <span class="file-cta button is-link is-small" i18n="import-metadata"></span>
+                                                <span class="file-cta button is-link is-small is-fullwidth" i18n="import-metadata"></span>
                                             </label>
                                         </div>
                                     </div>
@@ -140,8 +197,8 @@ class ProjectModal extends HTMLElement {
                                         <button class="button is-fullwidth is-small is-link" onclick="openMDMLoadDialog(true)" i18n="load-from-mdm"></button>
                                     </div>
                                     <div class="column is-6 p-1">
-                                        <div class="file is-hidden" id="odm-import-clinicaldata">
-                                            <label class="file-label">
+                                        <div class="file is-hidden is-fullwidth" id="odm-import-clinicaldata">
+                                            <label class="file-label is-fullwidth">
                                                 <input class="file-input" type="file" accept=".xml,text/xml" onchange="importODMClinicaldata()" multiple>
                                                 <span class="file-cta button is-link is-small" i18n="import-clinicaldata"></span>
                                             </label>
@@ -154,10 +211,10 @@ class ProjectModal extends HTMLElement {
                                 <p class="mb-5" i18n="example-data-hint"></p>
                                 <div class="field has-addons">
                                     <div class="control is-expanded">
-                                        <input class="input is-link" type="text" autocomplete="off" i18n-ph="amount" autocomplete-mode="1" id="example-data-input">
+                                        <input class="input is-link is-small" type="text" autocomplete="off" i18n-ph="amount" autocomplete-mode="1" id="example-data-input">
                                     </div>
                                     <div class="control">
-                                        <a class="button is-link" id="example-data-create-button" i18n="create" onclick="createRandomSubjects()"></a>
+                                        <a class="button is-link is-small" id="example-data-create-button" i18n="create" onclick="createRandomSubjects()"></a>
                                     </div>
                                 </div>
                             </div>
@@ -184,10 +241,20 @@ class ProjectModal extends HTMLElement {
                             </div>
                         </div>
                         <div class="width-is-three-quarters is-hidden" id="users-options">
-                            <div class="notification is-link is-light">
-                                <h1 class="title is-4" i18n="users"></h1>
-                                <p i18n="users-hint"></p>
+                        <div class="notification is-link is-light">
+                            <div class="is-flex">
+                            <h1 class="title is-4" i18n="users"></h1>
+                            <button style="height: 25px" class="button is-link is-rounded is-small has-background-link-light has-text-link has-focus-none" onclick="reloadUsers()">
+                                <span class="icon">
+                                    <i class="fas fa-sync-alt"></i>
+                                </span>
+                            </button>
                             </div>
+                            <p i18n="users-hint"></p>
+                            <div id="users-option-protected-notification" class="notification is-link is-light is-hidden">
+                                <p i18n="user-protected-hint"></p>
+                            </div>
+                        </div>
                             <div class="columns">
                                 <div class="column">
                                     <nav class="panel">
@@ -222,6 +289,10 @@ class ProjectModal extends HTMLElement {
                                             <label class="label" i18n="initial-password"></label>
                                             <input class="input" id="user-password-input" type="text">
                                         </div>
+                                        <label class="checkbox is-block mb-5">
+                                            <input type="checkbox" id="owner-protected-input-setting">
+                                            <span i18n="owner-protected-hint"></span>
+                                        </label>
                                     </div>
                                     <div class="mt-5" id="user-rights-inputs">
                                         <hr>
@@ -231,7 +302,7 @@ class ProjectModal extends HTMLElement {
                                     </div>
                                     <div class="buttons are-small mt-5">
                                         <button class="button is-link" id="user-save-button" onclick="saveUser()" i18n="save"></button>
-                                        <button class="button is-danger" id="user-remove-button" onclick="removeUser()" i18n="remove"></button>
+                                        <button class="button is-danger" id="user-remove-button" onclick="showRemoveUserModal()" i18n="remove"></button>
                                     </div>
                                 </div>
                             </div>
