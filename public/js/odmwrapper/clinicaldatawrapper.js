@@ -73,9 +73,10 @@ export class FormItemData {
 }
 
 export class AuditRecord {
-    constructor(type, studyEventOID, formOID, userOID, locationOID, date, dataStatus, dataChanges) {
+    constructor(type, studyEventOID, studyEventRepeatKey, formOID, userOID, locationOID, date, dataStatus, dataChanges) {
         this.type = type;
         this.studyEventOID = studyEventOID;
+        this.studyEventRepeatKey = studyEventRepeatKey;
         this.formOID = formOID;
         this.userOID = userOID;
         this.locationOID = locationOID;
@@ -110,8 +111,17 @@ const $ = query => subjectData.querySelector(query);
 const $$ = query => subjectData.querySelectorAll(query);
 
 export const sortOrderTypes = {
-    CREATEDDATE: "creation-date",
-    ALPHANUMERICALLY: "alphanumerical"
+    MODIFIEDDATE_DESC: "modified-date-desc",
+    MODIFIEDDATE_ASC: "modified-date-asc",
+    ALPHANUMERICALLY_AZ: "alphanumerical-asc",
+    ALPHANUMERICALLY_ZA: "alphanumerical-desc"
+};
+
+export const dateFilterTypes = {
+    TODAY: "today",
+    LAST_7_DAYS: "last-7-days",
+    LAST_30_DAYS: "last-30-days",
+    ALL: "all"
 };
 
 export const dataStatusTypes = {
@@ -167,7 +177,7 @@ async function loadStoredSubjectData(fileName) {
 }
 
 export function getSubject(uniqueKey) {
-    return uniqueKey ? subjects.find(subject => subject.uniqueKey == uniqueKey) : subject;
+    return uniqueKey ? subjects.find(subject => subject.uniqueKey.toLowerCase() == uniqueKey.toLowerCase()) : subject;
 }
 
 export function getLastUpdate() {
@@ -177,7 +187,7 @@ export function getLastUpdate() {
 export async function getClinicalData(studyOID, metadataVersionOID) {
     let clinicalData = clinicaldataTemplates.getClinicalData(studyOID, metadataVersionOID);
 
-    for (let subject of getSubjects(admindataWrapper.getCurrentUserSiteOID(), sortOrderTypes.CREATEDDATE)) {
+    for (let subject of getSubjects(admindataWrapper.getCurrentUserSiteOID(), sortOrderTypes.MODIFIEDDATE_DESC)) {
         clinicalData.appendChild(await loadStoredSubjectData(subject.fileName));
     }
 
@@ -185,6 +195,7 @@ export async function getClinicalData(studyOID, metadataVersionOID) {
 }
 
 export async function loadSubjects() {
+    console.log("Load subjects ...");
 
     subjects = [];
     const fileNames = await ioHelper.getSubjectFileNames();
@@ -210,7 +221,8 @@ export async function loadSubjects() {
     }
 
     // Evaluate whether data conflicts are present (i.e., multiple users edited the same subject at the same time)
-    subjects = sortSubjects(subjects, sortOrderTypes.ALPHANUMERICALLY);
+    //const dateFilter = $("#date-filter-subject-select-inner")?.value;
+    subjects = sortSubjects(subjects, sortOrderTypes.ALPHANUMERICALLY_AZ, dateFilterTypes.ALL);
     for (let i = 0; i < subjects.length-1; i++) {
         if (subjects[i].key == subjects[i+1].key) {
             subjects[i].hasConflict = true;
@@ -250,23 +262,48 @@ export async function addSubject(subjectKey, siteOID) {
     return Promise.resolve();
 }
 
-export function getSubjects(siteOID, sortOrder) {
+export function getSubjects(siteOID, sortOrder, dateFilter = null) {
     let filteredSubjects = siteOID ? subjects.filter(subject => subject.siteOID == siteOID) : subjects;
-    filteredSubjects = sortOrder ? sortSubjects(filteredSubjects, sortOrder) : filteredSubjects;
+    filteredSubjects = (sortOrder || dateFilter ? sortSubjects(filteredSubjects, sortOrder, dateFilter) : filteredSubjects);
 
     return filteredSubjects;
 }
 
-function sortSubjects(subjects, sortOrder) {
-    switch (sortOrder) {
-        case sortOrderTypes.CREATEDDATE:
-            subjects.sort((a, b) => a.createdDate > b.createdDate ? 1 : (a.createdDate < b.createdDate ? -1 : 0));
-            break;
-        case sortOrderTypes.ALPHANUMERICALLY:
-            if (ioHelper.getSetting("subjectKeyMode") == ioHelper.subjectKeyModes.AUTO) subjects.sort((a, b) => a.keyInt > b.keyInt ? 1 : (a.keyInt < b.keyInt ? -1 : 0));
-            else subjects.sort((a, b) => a.key > b.key ? 1 : (a.key < b.key ? -1 : 0));
+function sortSubjects(subjects, sortOrder, dateFilter = null) {
+    if(dateFilter) {
+        const today = new Date();
+        switch (dateFilter) {
+            case dateFilterTypes.TODAY:
+                subjects = subjects.filter(subject => today.toDateString() === new Date(subject.modifiedDate).toDateString());
+                break;
+            case dateFilterTypes.LAST_7_DAYS:
+                subjects = subjects.filter(subject => today.getTime() - new Date(subject.modifiedDate).getTime() < 7*24*3600*1000);
+                break;
+            case dateFilterTypes.LAST_30_DAYS:
+                subjects = subjects.filter(subject => today.getTime() - new Date(subject.modifiedDate).getTime() < 30*24*3600*1000);
+                break
+            case dateFilterTypes.ALL:
+                break
+        }
     }
-
+    if(sortOrder) {
+        switch (sortOrder) {
+            case sortOrderTypes.MODIFIEDDATE_ASC:
+                subjects.sort((a, b) => a.modifiedDate > b.modifiedDate ? 1 : (a.modifiedDate < b.modifiedDate ? -1 : 0));
+                break;
+            case sortOrderTypes.MODIFIEDDATE_DESC:
+                subjects.sort((a, b) => a.modifiedDate < b.modifiedDate ? 1 : (a.modifiedDate > b.modifiedDate ? -1 : 0));
+                break;
+            case sortOrderTypes.ALPHANUMERICALLY_AZ:
+                if (ioHelper.getSetting("subjectKeyMode") == ioHelper.subjectKeyModes.AUTO) subjects.sort((a, b) => a.keyInt > b.keyInt ? 1 : (a.keyInt < b.keyInt ? -1 : 0));
+                else subjects.sort((a, b) => a.key > b.key ? 1 : (a.key < b.key ? -1 : 0));
+                break
+            case sortOrderTypes.ALPHANUMERICALLY_ZA:
+                if (ioHelper.getSetting("subjectKeyMode") == ioHelper.subjectKeyModes.AUTO) subjects.sort((a, b) => a.keyInt < b.keyInt ? 1 : (a.keyInt > b.keyInt ? -1 : 0));
+                else subjects.sort((a, b) => a.key < b.key ? 1 : (a.key > b.key ? -1 : 0));
+                break
+        }
+    }
     return subjects;
 }
 
@@ -289,20 +326,21 @@ async function loadSubjectData(subjectKey) {
     if (subject) return await loadStoredSubjectData(subject.fileName);
 }
 
-export async function storeSubject(subjectToStore, subjectDataToStore) {
+export async function storeSubject(subjectToStore, subjectDataToStore, disabledEncryption = false) {
     if(!subjectToStore || !subjectDataToStore) {
         subjectToStore = subject;
         subjectDataToStore = subjectData;
     }
     if (!subjectToStore) return;
+    console.log("Store subject ...");
 
     const previousFileName = subjectToStore.fileName;
     const modifiedDate = new Date();
 
-    subjectToStore.status = await getDataStatus(subjectToStore.uniqueKey, subjectDataToStore);
+    subjectToStore.status = await getDataStatus(subjectToStore.uniqueKey, subjectDataToStore); 
     subjectToStore.modifiedDate = modifiedDate;
     clinicaldataFile = new ClinicaldataFile(modifiedDate);
-    await ioHelper.setODM(subjectToStore.fileName, subjectDataToStore);
+    await ioHelper.setODM(subjectToStore.fileName, subjectDataToStore, disabledEncryption, ioHelper.hasServerURL() ? previousFileName : undefined);
 
     // This mechanism helps to prevent possible data loss when multiple users edit the same subject data at the same time (especially important for the offline mode)
     // If the previousFileName cannot be removed, the system keeps multiple current versions of the subject data and the user is notified that conflicting data exists
@@ -325,6 +363,23 @@ export async function removeClinicaldata() {
     for (let subject of subjects) {
         await ioHelper.removeODM(subject.fileName);
     }
+}
+
+export async function deactivateEncryptionForSubjects() {
+    let subjectsToLoad = subjects.map(async subject => {
+        return new Promise(async resolve => {
+            resolve({
+                subject,
+                subjectData: await loadSubjectData(subject.key)
+            });
+        });
+    });
+    return await Promise.all(subjectsToLoad).then(async loadedSubjects => {
+        for await (let loadedSubject of loadedSubjects) {
+            await storeSubject(loadedSubject.subject, loadedSubject.subjectData, true);
+        };
+        return true;
+    });
 }
 
 export async function storeSubjectFormData(studyEventOID, formOID, formItemDataList, dataStatus, studyEventRepeatKey) {
@@ -378,15 +433,17 @@ export async function storeSubjectFormData(studyEventOID, formOID, formItemDataL
 
 function getFormDataElements({studyEventOID, formOID, studyEventRepeatKey, subjectDataToCheck}) {
     if(!subjectDataToCheck) subjectDataToCheck = subjectData;
-    if (studyEventRepeatKey) {
+    if (studyEventRepeatKey) {   
         return subjectDataToCheck.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"][StudyEventRepeatKey="${studyEventRepeatKey}"] FormData[FormOID="${formOID}"]`);
-    } else {
-        return  subjectDataToCheck.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"] FormData[FormOID="${formOID}"]`);
     }
+    return subjectDataToCheck.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"] FormData[FormOID="${formOID}"]`);
 }
 
-async function getFormDataElementsAsync(studyEventOID, formOID, subjectToLoad) {
+async function getFormDataElementsAsync({studyEventOID, formOID, subjectToLoad, studyEventRepeatKey}) {
     let subjecttoLoadData = await loadStoredSubjectData(subjectToLoad.fileName);
+    if (studyEventRepeatKey) {   
+        return subjecttoLoadData.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"][StudyEventRepeatKey="${studyEventRepeatKey}"] FormData[FormOID="${formOID}"]`);
+    }
     return subjecttoLoadData.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"] FormData[FormOID="${formOID}"]`);
 }
 
@@ -395,8 +452,8 @@ export function getSubjectFormData(studyEventOID, formOID, studyEventRepeatKey) 
     return !subject ? [] : getFormItemDataList(getFormDataElements({studyEventOID, formOID, studyEventRepeatKey}));
 }
 
-export async function getSubjectFormDataAsync(studyEventOID, formOID, subjectToLoad) {
-    return !subjectToLoad ? [] : getFormItemDataList(await getFormDataElementsAsync(studyEventOID, formOID, subjectToLoad));
+export async function getSubjectFormDataAsync(studyEventOID, formOID, subjectToLoad, studyEventRepeatKey) {
+    return !subjectToLoad ? [] : getFormItemDataList(await getFormDataElementsAsync({studyEventOID, formOID, subjectToLoad, studyEventRepeatKey}));
 }
 
 function getFormItemDataList(formDataElements) {
@@ -434,23 +491,25 @@ export function getFormDataDifference(formItemDataList, studyEventOID, formOID, 
         const formItemData = formItemDataList.find(entry => entry.itemGroupOID == currentItemData.itemGroupOID && entry.itemOID == currentItemData.itemOID);
         if (!formItemData) formDataDifference.push(new FormItemData(currentItemData.itemGroupOID, currentItemData.itemOID, ""));
     }
-    
     return formDataDifference;
 }
 
 // A filter may contain a studyEventOID, formOID, itemGroupOID, itemOID, userOID, and month
 export function getAuditRecords(filter) {
+    console.log(filter);
     const auditRecords = [];
 
     for (let studyEventData of $$("StudyEventData")) {
         // Filter studyEvent
         const studyEventOID = studyEventData.getAttribute("StudyEventOID");
-        if (filter && filter.studyEventOID && filter.studyEventOID != studyEventOID) continue;
+        const studyEventRepeatKey = studyEventData.getAttribute("StudyEventRepeatKey");
+        //if filter is set, only load FormData with correct studyEventOID and studyEventRepeatKey
+        if (filter && ((filter.studyEventOID && filter.studyEventOID != studyEventOID) || (filter.studyEventRepeatKey && filter.studyEventRepeatKey != studyEventRepeatKey))) continue;
 
         for (let formData of studyEventData.querySelectorAll("FormData")) {
             // Filter form
             const formOID = formData.getAttribute("FormOID");
-            if (filter && filter.formOID && filter.formOID != formOID) continue;
+            if (!formOID || formOID === 'null' || (filter && filter.formOID && filter.formOID != formOID)) continue;
 
             const auditRecord = formData.querySelector("AuditRecord");
             if (!auditRecord) continue;
@@ -477,7 +536,7 @@ export function getAuditRecords(filter) {
             const dataStatus = flagValue ? parseInt(flagValue.textContent) : null;
             const dataStatusName = Object.keys(dataStatusTypes).find(key => dataStatusTypes[key] == dataStatus);
             auditRecords.push(
-                new AuditRecord(auditRecordTypes.FORMEDITED, studyEventOID, formOID, userOID, locationOID, date, dataStatusName.toLowerCase(), formItemData)
+                new AuditRecord(auditRecordTypes.FORMEDITED, studyEventOID, studyEventRepeatKey, formOID, userOID, locationOID, date, dataStatusName.toLowerCase(), formItemData)
             );
         }
     }
@@ -488,7 +547,7 @@ export function getAuditRecords(filter) {
         const locationOID = $("AuditRecord LocationRef").getAttribute("LocationOID");
         const date = new Date($("AuditRecord DateTimeStamp").textContent);
         auditRecords.push(
-            new AuditRecord(auditRecordTypes.SUBJECTCREATED, null, null, userOID, locationOID, date)
+            new AuditRecord(auditRecordTypes.SUBJECTCREATED, null, null, null, userOID, locationOID, date)
         );
     }
 
@@ -513,9 +572,11 @@ export function getAuditRecords(filter) {
     return auditRecords.sort((a, b) => a.date < b.date ? 1 : (a.date > b.date ? -1 : 0));
 }
 
-export function getAuditRecordFormData(studyEventOID, formOID, date) {
+export function getAuditRecordFormData(studyEventOID, studyEventRepeatKey, formOID, date) {
+    console.log(studyEventRepeatKey)
     const formDataElements = [];
-    for (const formDataElement of $$(`StudyEventData[StudyEventOID="${studyEventOID}"] FormData[FormOID="${formOID}"]`)) {
+    for (const formDataElement of $$(`StudyEventData[StudyEventOID="${studyEventOID}"]${studyEventRepeatKey ? '[StudyEventRepeatKey="' + studyEventRepeatKey + '"]':''} FormData[FormOID="${formOID}"]`)) {
+        console.log(formDataElement);
         const timestamp = formDataElement.querySelector("AuditRecord DateTimeStamp");
         if (timestamp && new Date(timestamp.textContent) <= date) formDataElements.push(formDataElement);
     }
@@ -555,7 +616,7 @@ export function getAutoNumberedSubjectKey() {
     // TODO: Performance should be improved in the future. Sorting is expensive and needs to be reduced
     // TODO: Moreover, when connected to a server, the server should be consulted to generate the next auto-numbered key
     // TODO: Alternatively, load the subject list from the server before the auto-numbered key is generated (for the manual mode as well)
-    const subjectsWithIntKeys = sortSubjects(subjects, sortOrderTypes.ALPHANUMERICALLY).filter(subject => subject.keyInt);
+    const subjectsWithIntKeys = sortSubjects(subjects, sortOrderTypes.ALPHANUMERICALLY_AZ).filter(subject => subject.keyInt);
     const highestNumber = subjectsWithIntKeys.length ? subjectsWithIntKeys[subjectsWithIntKeys.length - 1].key : 0;
     const subjectKey = parseInt(highestNumber) + 1;
 
@@ -567,12 +628,15 @@ export async function getDataStatus(subjectKey, subjectDataToCheck) {
     if(!subjectDataToCheck) subjectDataToCheck = subjectData;
     let dataStates = [];
     for await (const studyEventOID of studyEventOIDs) {
-        if(metadataWrapper.isStudyEventRepeating(studyEventOID))
-            dataStates = dataStates.concat((await getStudyEventRepeatKeys(studyEventOID, subjectKey ? subjectKey : subject.uniqueKey, subjectDataToCheck)).map(repeatKey => {getDataStatusForStudyEvent({studyEventOID, repeatKey, subjectDataToCheck});}));
+        if(metadataWrapper.isStudyEventRepeating(studyEventOID)) {
+            let keys = await getStudyEventRepeatKeys(studyEventOID, subjectKey ? subjectKey : subject.uniqueKey, subjectDataToCheck);
+            let states = keys.map(studyEventRepeatKey => getDataStatusForStudyEvent({studyEventOID, studyEventRepeatKey, subjectDataToCheck}));
+            dataStates = dataStates.concat(states);
+        }     
         else
             dataStates.push(getDataStatusForStudyEvent({studyEventOID, subjectDataToCheck}));
     }
-
+    if(dataStates.length == 0) return dataStatusTypes.EMPTY;
     if (dataStates.every(item => item == dataStatusTypes.VALIDATED)) return dataStatusTypes.VALIDATED;
     if (dataStates.every(item => item == dataStatusTypes.VALIDATED || item == dataStatusTypes.COMPLETE)) return dataStatusTypes.COMPLETE;
     if (dataStates.some(item => item == dataStatusTypes.VALIDATED || item == dataStatusTypes.COMPLETE || item == dataStatusTypes.INCOMPLETE)) return dataStatusTypes.INCOMPLETE;
@@ -584,13 +648,16 @@ export async function getStudyEventRepeatKeys(studyEventOID, subjectKey, subject
     if(!subjectKey) return [];
     let data = subjectDataToCheck;
     if(!data) data = subjectData;
-    if(subject && !subjectDataToCheck && subjectKey !== subject.uniqueKey) data = await loadStoredSubjectData(getSubject(subjectKey).fileName);
+    if(!data && subjectKey) {
+        data = await loadStoredSubjectData(getSubject(subjectKey).fileName);
+        subjectData = data;
+    }
+    if (subject && !subjectDataToCheck && subjectKey !== subject.uniqueKey) data = await loadStoredSubjectData(getSubject(subjectKey).fileName);
     return Array.from(data?.querySelectorAll(`StudyEventData[StudyEventOID="${studyEventOID}"]`) ?? []).map(event => parseInt(event.getAttribute("StudyEventRepeatKey"))).sort((a,b) => a-b);
 }
 
 export function getDataStatusForStudyEvent({studyEventOID, studyEventRepeatKey, subjectDataToCheck}) {
     const dataStates = metadataWrapper.getFormOIDsByStudyEvent(studyEventOID).map(formOID => getDataStatusForForm({studyEventOID, formOID, studyEventRepeatKey, subjectDataToCheck}));
-
     if (dataStates.every(item => item == dataStatusTypes.VALIDATED)) return dataStatusTypes.VALIDATED;
     if (dataStates.every(item => item == dataStatusTypes.VALIDATED || item == dataStatusTypes.COMPLETE)) return dataStatusTypes.COMPLETE;
     if (dataStates.some(item => item == dataStatusTypes.VALIDATED || item == dataStatusTypes.COMPLETE || item == dataStatusTypes.INCOMPLETE)) return dataStatusTypes.INCOMPLETE;
@@ -600,6 +667,7 @@ export function getDataStatusForStudyEvent({studyEventOID, studyEventRepeatKey, 
 
 export function getDataStatusForForm({studyEventOID, formOID, studyEventRepeatKey, subjectDataToCheck}) {
     if(!subjectDataToCheck) subjectDataToCheck = subjectData;
+
     const formDataElement = getFormDataElements({studyEventOID, formOID, studyEventRepeatKey, subjectDataToCheck}).getLastElement();
     if (!formDataElement) return dataStatusTypes.EMPTY;
 
@@ -753,4 +821,8 @@ export async function resolvePendingChanges() {
         if(!await setStudyEventDataRepeating(change, true)) return false;
     }
     return true;
+}
+
+export const getSubjectDataForCurrentSubject = () => {
+    return subjectData;
 }

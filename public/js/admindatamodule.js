@@ -11,6 +11,10 @@ export async function init() {
     await admindataWrapper.loadStoredAdmindata().catch(() => admindataWrapper.loadEmptyProject());
 }
 
+window.reloadUsers = () => {
+    loadUsers();
+}
+
 export async function loadUsers() {
     $$("#users-options .panel a").removeElements();
     $$("#user-rights .checkbox").removeElements();
@@ -95,12 +99,32 @@ function loadUser(userOID) {
                 $$("#user-rights input").forEach(checkbox => {
                     if (user.rights && user.rights.includes(checkbox.name)) checkbox.checked = true;
                 });
+                if(admindataWrapper.getCurrentUserOID() == user.oid) {
+                    $('#owner-protected-input-setting').parentElement.show();
+                    $('#owner-protected-input-setting').checked = user.ownerProtected
+                }
+                else {
+                    $('#owner-protected-input-setting').parentElement.hide();
+                }
+                if(user.ownerProtected && admindataWrapper.getCurrentUserOID() != user.oid) return deactivateUserDetails();
+                $('#users-option-protected-notification').hide();
             })
-            .catch(() => console.log("The selected user could not be loaded from the server (i.e., offline, no permission, or user not yet synced with the server)."));
+            .catch(() => {$('#users-option-protected-notification').hide(); console.log("The selected user could not be loaded from the server (i.e., offline, no permission, or user not yet synced with the server).")});
     } else {
         // Local users have all rights
         $$("#user-rights input").forEach(checkbox => checkbox.checked = true);
     }
+}
+
+function deactivateUserDetails() {
+    $("#user-first-name-input").disabled = true;
+    $("#user-last-name-input").disabled = true;
+    $("#user-site-select-inner").disabled = true;
+    $("#user-save-button").disabled = true;
+    $("#user-remove-button").disabled = true;
+    $$(`#user-rights input`).forEach(checkbox => checkbox.disabled = true);
+    $$(`#user-login-inputs input`).forEach(input => input.disabled = true);
+    $('#users-option-protected-notification').show();
 }
 
 window.addUser = function() {
@@ -124,12 +148,24 @@ window.saveUser = async function() {
         const initialPassword = $("#user-password-input").value;
         const credentials = new ioHelper.Credentials(username, initialPassword);
         const rights = Array.from($$("#user-rights input:checked")).map(checkbox => checkbox.name);
-        await ioHelper.setUserOnServer(userOID, credentials, rights, locationOID).catch(error => console.log(error));
+        const ownerProtected = $('#owner-protected-input-setting').checked;
+        await ioHelper.setUserOnServer(userOID, credentials, rights, locationOID, ownerProtected).catch(error => console.log(error));
     }
 
     if (userOID == admindataWrapper.getCurrentUserOID()) ioHelper.dispatchGlobalEvent("CurrentUserEdited");
     
     loadUsers();
+}
+
+window.showRemoveUserModal = function() {
+    const userOID = $("#users-options .panel a.is-active").getOID();
+    if(ioHelper.getLoggedInUser().oid === userOID) {
+        ioHelper.showMessage(languageHelper.getTranslation("no-self-delete"), languageHelper.getTranslation("no-self-delete-text"));
+        return;
+    }
+    ioHelper.showMessage(languageHelper.getTranslation('remove-user'), languageHelper.getTranslation("remove-user-hint"), {
+        [languageHelper.getTranslation("yes")]: () => removeUser(),
+    })
 }
 
 window.removeUser = function() {

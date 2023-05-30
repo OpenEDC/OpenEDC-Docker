@@ -13,6 +13,16 @@ export function validateImport(odmXMLString) {
     // A check against the ODM xsd schema is currently not implemented for flexibility purposes (e.g., for supporting REDCap ODM files)
     if (!odm.querySelector("ODM")) throw languageHelper.getTranslation("upload-error-no-odm");
 
+    //Replace OIDs with underscores
+    let oidList = {};
+    [...odm.querySelectorAll('[OID]')].forEach(element => oidList[element.getAttribute('OID')] = element.getAttribute('OID').replace(/(\w)-(?=\w)/g, "$1_").replace(/([a-zA-Z]\w*?)___(?=\w)/g, "$1_").replace(/([a-zA-Z]\w*?)__(?=\w)/g, "$1_"));
+
+    Object.keys(oidList).reverse().forEach(oldOID => {
+        odmXMLString = odmXMLString.replace(`OID="${oldOID}"`, `OID="${oidList[oldOID]}"`)
+    });
+
+    odm = new DOMParser().parseFromString(odmXMLString, "text/xml");
+
     // Add a protocol element if there is no one present (e.g., for supporting the CDISC eCRF Portal)
     // Moreover, add a study event and reference all forms within this event if there is no one available
     if (odm.querySelector("MetaDataVersion") && !odm.querySelector("Protocol")) {
@@ -44,12 +54,14 @@ export function validateImport(odmXMLString) {
         if (attributeValue.match(/^\d/)) attributeValue = "E" + attributeValue;
         element.setAttribute(attribute, attributeValue.replace(/(\w)-(?=\w)/g, "$1_"));
     }));
-    odm.querySelectorAll("FormalExpression").forEach(expression => {
-        let expressionValue = expression.textContent;
-        if (expressionValue.match(/^\d/)) expressionValue = "E" + expressionValue;
-        expression.textContent = expressionValue.replace(/(\w)-(?=\w)/g, "$1_");
-    });
 
+    Object.keys(oidList).forEach(oldOID => {
+        odm.querySelectorAll("FormalExpression").forEach(expression => {
+            let expressionValue = expression.textContent;
+            if (expressionValue.match(/^\d/)) expressionValue = "E" + expressionValue;
+            expression.textContent = expressionValue.replace(new RegExp(`${oldOID}([\\s*\\/+^=?:<>()-]|$)`, "g"), `${oidList[oldOID]}$1`);
+        });
+    });
     // Add an audit record if no one is present
     const creationDate = new Date();
     const userOID = admindataWrapper.getCurrentUserOID();

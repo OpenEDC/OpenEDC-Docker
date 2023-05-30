@@ -1,0 +1,24 @@
+{
+  "name": "public",
+  "version": "1.0.0",
+  "description": "> OpenEDC is an electronic data capture (EDC) system for designing and conducting secure medical research studies based on the [CDISC ODM-XML](https://www.cdisc.org/standards/data-exchange/odm) standard. The standard is adopted without modifications to foster data exchange, metadata reuse, and open science.",
+  "main": "serviceworker.js",
+  "directories": {
+    "example": "example",
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@git.med.uni-heidelberg.de:imi/private/mdm/openedc.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-react-app": "^3.1.2"
+  }
+}

@@ -25,6 +25,7 @@ const exampleStrings = ["kurzer String", "Dies ist eine längere Antwort. Deshal
 export async function init() {
     createSiteFilterSelect();
     createSortTypeSelect();
+    createDateFilterSelect();
     
     await clinicaldataWrapper.loadSubjects();
     setIOListeners();
@@ -66,6 +67,23 @@ function createSortTypeSelect() {
     };
 }
 
+function createDateFilterSelect() {
+    const translatedDateFilterTypes = Object.values(clinicaldataWrapper.dateFilterTypes).map(filterType => languageHelper.getTranslation(filterType));
+    $("#date-filter-subject-select-outer")?.remove();
+    $("#date-filter-subject-control").appendChild(htmlElements.getSelect("date-filter-subject-select", true, true, Object.values(clinicaldataWrapper.dateFilterTypes), null, translatedDateFilterTypes, true));
+    $("#date-filter-subject-select-inner").oninput = inputEvent => {
+        loadSubjectKeys();
+        inputEvent.target.blur();
+    };
+    $("#date-filter-subject-select-inner").value = clinicaldataWrapper.dateFilterTypes.LAST_7_DAYS;
+}
+
+const addSubjectAutomatic = (subjectKey) => {
+    if (safeCloseClinicaldata(() => addSubjectAutomatic(subjectKey))) return;
+    const siteOID = admindataWrapper.getSiteOIDByName($("#filter-site-select-inner").value);
+    addSubject(subjectKey, siteOID);
+}
+
 window.addSubjectManual = function() {
     // Check if the data has changed / new data has been entered and show a prompt first
     if (safeCloseClinicaldata(addSubjectManual)) return;
@@ -87,67 +105,127 @@ window.addSubjectAuto = function() {
     addSubject(subjectKey, siteOID);
 }
 
+/**
+ * Opens the barcode scan modal and adds a subject based on the scanned barcode.
+ */
 window.addSubjectBarcode = async function() {
+    // Import the barcode modal component
     await import("./components/barcodemodal.js");
-
-    // Check if the data has changed / new data has been entered and show a prompt first
+  
+    // If the data has changed, show a prompt and return
     if (safeCloseClinicaldata(addSubjectBarcode)) return;
-
+  
     // Deselect the currently selected subject
     if (currentSubjectKey) loadSubjectData();
     
-    // Open the barcode scan modal
+    // Create and append the barcode modal element to the body
     const barcodeModal = document.createElement("barcode-modal");
     barcodeModal.setHeading(languageHelper.getTranslation("barcode"));
     barcodeModal.setHelpText(languageHelper.getTranslation("barcode-help-text"));
     barcodeModal.setInputPlaceholder(languageHelper.getTranslation("new-subject"));
     barcodeModal.setButtonText(languageHelper.getTranslation("add"));
     document.body.appendChild(barcodeModal);
-}
+  }
 
+/**
+ * Adds a subject to the system.
+ * 
+ * @param {string} subjectKey - The subject key.
+ * @param {string} siteOID - The site's unique identifier.
+ */
 export function addSubject(subjectKey, siteOID) {
+    // Attempt to add the subject to the system
     clinicaldataWrapper.addSubject(subjectKey, siteOID)
-        .then(() => {
-            loadSubjectKeys();
-            skipDataHasChangedCheck = true;
-            loadSubjectData(subjectKey);
-            ioHelper.dispatchGlobalEvent("SubjectAdded", subjectKey);
-        })
-        .catch(error => {
-            switch (error) {
-                case clinicaldataWrapper.errors.SUBJECTKEYEMPTY:
-                    ioHelper.showMessage(languageHelper.getTranslation("enter-subject-key"), languageHelper.getTranslation("enter-subject-key-text"));
-                    break;
-                case clinicaldataWrapper.errors.SUBJECTKEYEXISTENT:
-                    ioHelper.showMessage(languageHelper.getTranslation("subject-key-existent"), languageHelper.getTranslation("subject-key-existent-open-text"),
-                        {
-                            [languageHelper.getTranslation("open")]: () => loadSubjectData(subjectKey)
-                        }
-                    );
-                    break;
-                case clinicaldataWrapper.errors.SUBJECTKEYEXISTENTOTHERSITE:
-                    ioHelper.showMessage(languageHelper.getTranslation("subject-key-existent"), languageHelper.getTranslation("subject-key-existent-other-site-text"));
-            }
-        });
+    .then(() => {
+        // If the subject was added successfully, reload the subject keys, skip the data has changed check, load the subject data, and dispatch a global event called "SubjectAdded" with the subject key
+        loadSubjectKeys();
+        skipDataHasChangedCheck = true;
+        loadSubjectData(subjectKey);
+        ioHelper.dispatchGlobalEvent("SubjectAdded", subjectKey);
+    })
+    .catch(error => {
+        // If an error occurred, show a message based on the type of error
+        switch (error) {
+            case clinicaldataWrapper.errors.SUBJECTKEYEMPTY:
+                ioHelper.showMessage(languageHelper.getTranslation("enter-subject-key"), languageHelper.getTranslation("enter-subject-key-text"));
+                break;
+            case clinicaldataWrapper.errors.SUBJECTKEYEXISTENT:
+                ioHelper.showMessage(languageHelper.getTranslation("subject-key-existent"), languageHelper.getTranslation("subject-key-existent-open-text"),
+                {
+                    [languageHelper.getTranslation("open")]: () => loadSubjectData(subjectKey)
+                });
+                break;
+            case clinicaldataWrapper.errors.SUBJECTKEYEXISTENTOTHERSITE:
+                ioHelper.showMessage(languageHelper.getTranslation("subject-key-existent"), languageHelper.getTranslation("subject-key-existent-other-site-text"));
+        }
+    });
+  }
+
+export const loadOrCreate = async (caseID) => {
+    const selectedSite = admindataWrapper.getSiteOIDByName($("#filter-site-select-inner").value);
+    const sortOrder = $("#sort-subject-select-inner").value;
+    const dateFilter = clinicaldataWrapper.dateFilterTypes.ALL;
+    const subjects = clinicaldataWrapper.getSubjects(selectedSite, sortOrder, dateFilter);
+    if(subjects.find(subject => subject.uniqueKey == caseID.toLowerCase())) {
+        await loadSubjectData(caseID);
+        return;
+    }
+    //if it does not exist, create it
+    addSubjectAutomatic(caseID);
 }
 
 export function loadSubjectKeys() {
+    // Remove any existing elements from the subject panel blocks
     $$("#subject-panel-blocks a").removeElements();
-
+  
+    // Retrieve the selected site, sort order, and date filter
     const selectedSite = admindataWrapper.getSiteOIDByName($("#filter-site-select-inner").value);
     const sortOrder = $("#sort-subject-select-inner").value;
-    const subjects = clinicaldataWrapper.getSubjects(selectedSite, sortOrder);
+    const dateFilter = $("#date-filter-subject-select-inner").value;
+  
+    // Get the subjects based on the selected site, sort order, and date filter
+    const subjects = clinicaldataWrapper.getSubjects(selectedSite, sortOrder, dateFilter);
+  
+    // If there are subjects, hide the "no subjects" hint; otherwise, show it
     subjects.length ? $("#no-subjects-hint").hide() : $("#no-subjects-hint").show();
-
+  
+    // Add each subject to the panel block
     for (let subject of subjects) {
-        const siteSubtitle = subject.siteOID && !selectedSite ? admindataWrapper.getSiteNameByOID(subject.siteOID) : null;
-        let panelBlock = htmlElements.getClinicaldataPanelBlock(subject.uniqueKey, subject.key, null, siteSubtitle, subject.status, subject.hasConflict);
-        panelBlock.onclick = (e) => subjectClicked(subject.uniqueKey);
-        $("#subject-panel-blocks").appendChild(panelBlock);
+        addSubjectToPanelBlock(subject, selectedSite)
     }
-
+  
+    // If the currentSubjectKey variable is defined, activate the element with the corresponding oid attribute
     if (currentSubjectKey) $(`#subject-panel-blocks [oid="${currentSubjectKey}"]`).activate();
+  
+    // Dispatch a global event called "SubjectKeysLoaded"
     ioHelper.dispatchGlobalEvent("SubjectKeysLoaded");
+}
+
+window.reloadSubjectKeys = () => {
+    loadSubjectKeys();
+}
+
+/**
+ * Adds a subject to the panel block.
+ * 
+ * @param {Object} subject - The subject object.
+ * @param {string} selectedSite - The selected site.
+ */
+function addSubjectToPanelBlock(subject, selectedSite) {
+    // Get the site subtitle based on the subject's siteOID and the selected site
+    const siteSubtitle = subject.siteOID && !selectedSite ? admindataWrapper.getSiteNameByOID(subject.siteOID) : null;
+  
+    // Get the panel block element for the subject
+    let panelBlock = htmlElements.getClinicaldataPanelBlock(subject.uniqueKey, subject.key, null, siteSubtitle, subject.status, subject.hasConflict);
+  
+    // Attach an onclick event handler to the panel block element
+    panelBlock.onclick = (e) => subjectClicked(subject.uniqueKey);
+  
+    // Append the panel block element to the subject panel blocks element
+    $("#subject-panel-blocks").appendChild(panelBlock);
+  
+    // Dispatch a global event called "SubjectLoaded" with the subject's unique key
+    ioHelper.dispatchGlobalEvent("SubjectLoaded", subject.uniqueKey);
 }
 
 function subjectClicked(subjectKey) {
@@ -160,32 +238,52 @@ function subjectClicked(subjectKey) {
         subjectKey = null;
         if (!ioHelper.userHasRight(ioHelper.userRights.EDITMETADATA)) currentPath.formOID = null;
     }
-    
-
     loadSubjectData(subjectKey);
 }
 
+/**
+ * Loads the data for a subject.
+ * 
+ * @param {string} subjectKey - The subject key.
+ */
 async function loadSubjectData(subjectKey) {
-    // Automatically select the first study event if there is only one (present here as well mainly because of mobile auto survey view function)
+    // If there is only one study event and it is hidden, automatically select it
     if (!currentPath.studyEventOID && eventsAreHidden()) currentPath.studyEventOID = metadataWrapper.getStudyEvents()[0].getOID();
-
-    await clinicaldataWrapper.loadSubject(subjectKey)
-        .then(subject => {
-            currentSubjectKey = subject?.uniqueKey;
-            cachedFormData = null;
-        })
-        .catch(() => {
-            currentSubjectKey = null;
-            clinicaldataWrapper.clearSubject();
-            ioHelper.showMessage(languageHelper.getTranslation("subject-not-loaded-title"), languageHelper.getTranslation("subject-not-loaded-error"));
-        });
-
+  
+    // Load the subject data
+    const subject = await clinicaldataWrapper.loadSubject(subjectKey)
+    .catch(() => {
+        // If the subject could not be loaded, clear the current subject key, clear the subject data, and show an error message
+        currentSubjectKey = null;
+        clinicaldataWrapper.clearSubject();
+        ioHelper.showMessage(languageHelper.getTranslation("subject-not-loaded-title"), languageHelper.getTranslation("subject-not-loaded-error"));
+    });
+  
+    // Update the current subject key
+    currentSubjectKey = subject?.uniqueKey;
+  
+    // Clear the cached form data
+    cachedFormData = null;
+  
+    // Deactivate the currently active subject in the subject panel blocks
     $("#subject-panel-blocks a.is-active")?.deactivate();
-    if (currentSubjectKey) $(`#subject-panel-blocks [oid="${currentSubjectKey}"]`).activate();
+  
+    // If the current subject key is defined, add the subject to the panel block and activate it
+    if (currentSubjectKey) {
+        if(!$(`#subject-panel-blocks [oid="${currentSubjectKey}"]`)) {
+            addSubjectToPanelBlock(subject, admindataWrapper.getSiteOIDByName($("#filter-site-select-inner").value))
+        }
+        $(`#subject-panel-blocks [oid="${currentSubjectKey}"]`).activate();
+    }
+  
+    // If the current subject key is defined, scroll the subject panel blocks to the element with the corresponding oid attribute
     if (currentSubjectKey) ioHelper.scrollParentToChild($(`#subject-panel-blocks [oid="${currentSubjectKey}"]`));
+  
+    // Enable or disable the subject info button based on the current subject key and the user's rights
     $("#subject-info-button").disabled = currentSubjectKey ? false : true;
     if (!ioHelper.userHasRight(ioHelper.userRights.MANAGESUBJECTS)) $("#subject-info-button").disabled = true;
-
+  
+    // Reload the tree
     await reloadTree();
 }
 
@@ -207,6 +305,7 @@ window.createRandomSubjects = async function() {
         }
         catch(error) {
             if(error == clinicaldataWrapper.errors.SUBJECTKEYEXISTENT || error == clinicaldataWrapper.errors.SUBJECTKEYEXISTENTOTHERSITE) amount++;
+            else console.log(error);
         }
     }
 }
@@ -219,6 +318,7 @@ async function createExampleData(subjectKey) {
     let maxInt = 100;
 
     for(let seOID of metadataWrapper.getStudyEventOIDs()) {
+        const isSERepeating = metadataWrapper.isStudyEventRepeating(seOID);
         for(let f of metadataWrapper.getFormsByStudyEvent(seOID)) {
             const formOID = f.getAttribute('OID');
             let formItemDataList = [];
@@ -239,6 +339,7 @@ async function createExampleData(subjectKey) {
                     }
                    
                     const dataType = i.getAttribute('DataType');
+                    const hasCodeList = metadataWrapper.getCodeListOIDByItem(itemOID) ? true : false;
                     const codelistItems = metadataWrapper.getCodeListItemsByItem(itemOID);
 
                     //considers range checks when assigning values
@@ -256,7 +357,9 @@ async function createExampleData(subjectKey) {
                     let value;
                     switch (dataType) {
                         case "integer": 
-                            if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            if(hasCodeList) {
+                                if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            }
                             else value = `${getRandomNumber(minInt, maxInt, 'integer')}`;
                             break;
                         case "boolean":
@@ -264,7 +367,9 @@ async function createExampleData(subjectKey) {
                             break;
                         case "string":
                         case "text": 
-                            if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            if(hasCodeList) {
+                                if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            }
                             else value = `${exampleStrings[getRandomNumber(0, exampleStrings.length - 1, 'integer')]}`
                             break;
                         case "datetime": 
@@ -278,7 +383,9 @@ async function createExampleData(subjectKey) {
                             break;
                         case "double":
                         case "float":
-                            if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            if(hasCodeList) {
+                                if(codelistItems.length > 0) value = `${codelistItems[getRandomNumber(0, codelistItems.length - 1, 'integer')].getAttribute('CodedValue')}`;
+                            }
                             else value = `${Math.floor(getRandomNumber(minInt, maxInt, 'float')*100)/100}`;
                             break;
                         default:
@@ -290,7 +397,7 @@ async function createExampleData(subjectKey) {
                     }
                 }
             }
-            await clinicaldataWrapper.storeSubjectFormData(seOID, formOID, formItemDataList, clinicaldataWrapper.dataStatusTypes.COMPLETE );
+            await clinicaldataWrapper.storeSubjectFormData(seOID, formOID, formItemDataList, clinicaldataWrapper.dataStatusTypes.COMPLETE, isSERepeating ? 1 : null);
             skipDataHasChangedCheck = true;
             await loadTree(seOID, formOID);
         }
@@ -325,6 +432,7 @@ export async function reloadTree() {
     }
 
     skipDataHasChangedCheck = true;
+    //enableInputSection(false);
     await loadTree(currentPath.studyEventOID, currentPath.formOID, currentPath.studyEventRepeatKey);
 }
 
@@ -353,13 +461,13 @@ async function loadTree(studyEventOID, formOID, studyEventRepeatKey) {
         if (repeating) {
             let repeatKeys = await clinicaldataWrapper.getStudyEventRepeatKeys(studyEventOID, currentSubjectKey);
             repeatKeys = repeatKeys.sort((a, b) => a - b);
-            for (const repeatKey of repeatKeys) {
-                const dataStatus = currentSubjectKey ? clinicaldataWrapper.getDataStatusForStudyEvent({studyEventOID, repeatKey}) : clinicaldataWrapper.dataStatusTypes.EMPTY;
-                renderStudyEvent(studyEventOID, translatedDescription, name, dataStatus, repeatKey);
+            for (const studyEventRepeatKey of repeatKeys) {
+                const dataStatus = currentSubjectKey ? clinicaldataWrapper.getDataStatusForStudyEvent({studyEventOID, studyEventRepeatKey}) : clinicaldataWrapper.dataStatusTypes.EMPTY;
+                renderStudyEvent(studyEventOID, translatedDescription, name, dataStatus, studyEventRepeatKey);
             }
 
             // Always render one empty, additional study event
-            const nextRepeatKey = parseInt(repeatKeys.length ? repeatKeys.at(-1) : 0) + 1;
+            const nextRepeatKey = parseInt(repeatKeys.length ? repeatKeys[repeatKeys.length - 1] : 0) + 1;
             const dataStatus = clinicaldataWrapper.dataStatusTypes.EMPTY;
             renderStudyEvent(studyEventOID, translatedDescription, name, dataStatus, nextRepeatKey);
         } else {
@@ -373,43 +481,81 @@ async function loadTree(studyEventOID, formOID, studyEventRepeatKey) {
     if (currentPath.studyEventOID) await loadFormsByStudyEvent();
 }
 
-function renderStudyEvent(studyEventOID, translatedDescription, name, dataStatus, repeatKey) {
+/**
+ * Renders a study event in the clinical data tree.
+ * 
+ * @param {string} studyEventOID - The study event's unique identifier.
+ * @param {string} translatedDescription - The translated description of the study event.
+ * @param {string} name - The name of the study event.
+ * @param {string} dataStatus - The data status of the study event.
+ * @param {number} repeatKey - The repeat key of the study event.
+ */
+function renderStudyEvent(studyEventOID, translatedDescription, name, dataStatus, repeatKey) {  
+    // Determine if the study event is disabled
+    const disabled = metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'event-disabled', studyEventOID );
+  
+    // Get the repetition text for the study event
     const repetitionText = repeatKey ? `${repeatKey}. ${languageHelper.getTranslation("repetition")}`: null;
+  
+    // Get the panel block element for the study event
     const panelBlock = htmlElements.getClinicaldataPanelBlock(studyEventOID, translatedDescription, name, repetitionText, dataStatus, false, repeatKey);
+  
+    // Attach an onclick event handler to the panel block element
     panelBlock.onclick = () => loadTree(studyEventOID, null, repeatKey);
+  
+    // If the study event is disabled, add the "event-disabled" class to the panel block element
+    if(disabled) panelBlock.classList.add("event-disabled");
+  
+    // Append the panel block element to the clinicaldata study event panel blocks element
     $("#clinicaldata-study-event-panel-blocks").appendChild(panelBlock);
-}
+  }
 
+/**
+ * Loads the forms for the current study event in the clinical data tree.
+ */
 async function loadFormsByStudyEvent() {
+    // Deactivate the currently active study event in the panel blocks
     $("#clinicaldata-study-event-panel-blocks a.is-active")?.deactivate();
-
-    // Ad hoc implementation, improve for OpenEDC 2.0
+  
+    // If the current study event repeat key is defined, activate the corresponding panel block element
+    // If the element does not exist, return
     if (currentPath.studyEventRepeatKey) {
-        const studyEvent = $(`#clinicaldata-study-event-panel-blocks [oid="${currentPath.studyEventOID}"][study-event-repeat-key="${currentPath.studyEventRepeatKey}"]`)
-        //this means there is no repetition x for the chosen subject
-        if(!studyEvent) return;
-        studyEvent.activate();
+      const studyEvent = $(`#clinicaldata-study-event-panel-blocks [oid="${currentPath.studyEventOID}"][study-event-repeat-key="${currentPath.studyEventRepeatKey}"]`)
+      if(!studyEvent) return;
+      studyEvent.activate();
     } else {
-        $(`#clinicaldata-study-event-panel-blocks [oid="${currentPath.studyEventOID}"]`).activate();
+      // Otherwise, activate the panel block element with the corresponding oid attribute
+      $(`#clinicaldata-study-event-panel-blocks [oid="${currentPath.studyEventOID}"]`).activate();
     }
-
+  
+    // Get the form definitions for the current study event
     const formDefs = metadataWrapper.getFormsByStudyEvent(currentPath.studyEventOID);
+  
+    // Iterate through the form definitions
     for (let formDef of formDefs) {
-        const formOID = formDef.getOID();
-
-        const translatedDescription = formDef.getTranslatedDescription(languageHelper.getCurrentLocale());
-        const dataStatus = currentSubjectKey ? clinicaldataWrapper.getDataStatusForForm({studyEventOID: currentPath.studyEventOID, formOID, studyEventRepeatKey: currentPath.studyEventRepeatKey}) : clinicaldataWrapper.dataStatusTypes.EMPTY;
-        let panelBlock = htmlElements.getClinicaldataPanelBlock(formOID, translatedDescription, formDef.getName(), null, dataStatus);
-        panelBlock.onclick = () => loadTree(currentPath.studyEventOID, formOID, currentPath.studyEventRepeatKey);
-        $("#clinicaldata-form-panel-blocks").appendChild(panelBlock);
+      // Get the form oid and translated description
+      const formOID = formDef.getOID();
+      const translatedDescription = formDef.getTranslatedDescription(languageHelper.getCurrentLocale());
+  
+      // Get the data status for the form
+      const dataStatus = currentSubjectKey ? clinicaldataWrapper.getDataStatusForForm({studyEventOID: currentPath.studyEventOID, formOID, studyEventRepeatKey: currentPath.studyEventRepeatKey}) : clinicaldataWrapper.dataStatusTypes.EMPTY;
+  
+      // Get the panel block element for the form
+      let panelBlock = htmlElements.getClinicaldataPanelBlock(formOID, translatedDescription, formDef.getName(), null, dataStatus);
+  
+      // Attach an onclick event handler to the panel block element
+      panelBlock.onclick = () => loadTree(currentPath.studyEventOID, formOID, currentPath.studyEventRepeatKey);
+  
+      // Append the panel block element to the clinicaldata form panel blocks element
+      $("#clinicaldata-form-panel-blocks").appendChild(panelBlock);
     }
 
     // Automatically start the survey view when activated in project options and the current device is a smartphone or tablet
     if (ioHelper.getSetting("autoSurveyView") && ioHelper.isMobile() && currentSubjectKey && formDefs.length && !currentPath.formOID) {
-        currentPath.formOID = formDefs[0].getOID();
+        currentPath.formOID = getNextFormOID();//  formDefs[0].getOID();
         showSurveyView();
         adjustMobileUI();
-        document.dispatchEvent(new CustomEvent("SurveyViewShown"));
+        //document.dispatchEvent(new CustomEvent("SurveyViewShown"));
 
     }
 
@@ -441,7 +587,13 @@ async function loadFormData() {
     addDynamicFormLogicPost();
 
     // Show a hint if no subject is selected
-    if (!currentSubjectKey) showNoSubjectHint();
+    if (!currentSubjectKey) {
+        showNoSubjectHint();
+        enableInputSection(false)
+    } 
+    else {
+        enableInputSection(true)
+    }
 
     skipMandatoryCheck = false;
     skipDataHasChangedCheck = false;
@@ -476,18 +628,18 @@ async function loadFormMetadata() {
     $("#clinicaldata-form-title .subtitle").textContent = formDef.getTranslatedDescription(languageHelper.getCurrentLocale(), true);
 
     // Add the empty form
-    let form = await metadataWrapper.getFormAsHTML(currentPath.formOID, ioHelper.getSetting("textAsTextarea"));
+    let form = await metadataWrapper.getFormAsHTML(currentPath, currentSubjectKey, ioHelper.getSetting("textAsTextarea"));
+    const hideForm = metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', currentPath.formOID);
+    if(hideForm) $("#survey-view-button #survey-button").disabled = true;
+    else  $("#survey-view-button #survey-button").disabled = false;
+
     $("#odm-html-content")?.remove();
     $("#clinicaldata-content").appendChild(form);
     
 
     // Adjust the form navigation buttons
     $("#clinicaldata-previous-button").disabled = getPreviousFormOID(currentPath.formOID) ? false : true;
-    if (!getNextFormOID(currentPath.formOID)) {
-        $("#clinicaldata-next-button").textContent = languageHelper.getTranslation("finish");
-    } else {
-        $("#clinicaldata-next-button").textContent = languageHelper.getTranslation("continue");
-    }
+    updateFormButtons();
 }
 
 // Must be in place before clinical data is added to the form's input elements
@@ -499,7 +651,8 @@ function addDynamicFormLogicPre() {
         variables[cachedFormDataPath.toString()] = entry.value;
     });
     expressionHelper.setVariables(variables);
-    expressionHelper.process(metadataWrapper.getElementsWithExpression(currentPath.studyEventOID, currentPath.formOID));
+    const expressions = metadataWrapper.getElementsWithExpressionIncludeForms(currentPath.studyEventOID, currentPath.formOID);
+    expressionHelper.process(expressions);
 }
 
 // Added after the form has been rendered for performance purposes
@@ -547,7 +700,8 @@ function showItemAuditTrail(event) {
         studyEventOID: currentPath.studyEventOID,
         formOID: currentPath.formOID,
         itemGroupOID: itemGroupOID,
-        itemOID: itemOID
+        itemOID: itemOID,
+        studyEventRepeatKey: currentPath.studyEventRepeatKey
     });
 
     const table = htmlElements.getTable({
@@ -668,20 +822,26 @@ function showErrors(metadataNotFoundErrors, hiddenFieldWithValueErrors) {
 }
 
 window.loadNextFormData = async function() {
-    // This checks whether the saving process could found unanswered mandatory fields. The form data is stored either way
+    // This checks whether the saving process could find unanswered mandatory fields. The form data is stored either way
     if (!await saveFormData()) return;
 
     let nextFormOID = getNextFormOID(currentPath.formOID);
+
     skipDataHasChangedCheck = true;
     if (nextFormOID) {
-        loadTree(currentPath.studyEventOID, nextFormOID, currentPath.studyEventRepeatKey);
+        await loadTree(currentPath.studyEventOID, nextFormOID, currentPath.studyEventRepeatKey);
+        const hideForm = surveyViewIsActive() && metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', nextFormOID);
+        if(hideForm) {
+            loadNextFormData();
+            return;
+        }
     } else {
-        closeFormData();
+        await closeFormData(false, true);
         ioHelper.dispatchGlobalEvent("FormData finished");
     }
-
     loadSubjectKeys();
 }
+
 
 window.loadPreviousFormData = async function() {
     skipMandatoryCheck = true;
@@ -690,24 +850,76 @@ window.loadPreviousFormData = async function() {
     let previousFormOID = getPreviousFormOID(currentPath.formOID);
     if (previousFormOID) {
         skipDataHasChangedCheck = true;
-        loadTree(currentPath.studyEventOID, previousFormOID, currentPath.studyEventRepeatKey);
+        await loadTree(currentPath.studyEventOID, previousFormOID, currentPath.studyEventRepeatKey);
+        const hideForm = surveyViewIsActive() && metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', previousFormOID);
+        if(hideForm) {
+            loadPreviousFormData(previousFormOID);
+            return;
+        }
     }
 
     loadSubjectKeys();
 }
 
+function checkNextFormOIDIsLast(previousFormOID) {
+    let formDefs = metadataWrapper.getFormsByStudyEvent(currentPath.studyEventOID);
+    if(formDefs.length && !previousFormOID) {
+        previousFormOID = formDefs[0].getOID();
+        const hideForm = metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', previousFormOID);
+        if(!hideForm || !surveyViewIsActive()) return previousFormOID;
+    }
+    let keepSearching = true;
+    let nextFormOID;
+    while(keepSearching) {
+        for (let i = 0; i < formDefs.length-1; i++) {
+            if (formDefs[i].getOID() == previousFormOID) nextFormOID = formDefs[i+1].getOID();
+        }
+        if(!nextFormOID) {
+            return nextFormOID;
+        }
+        const hideForm = metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', nextFormOID);
+        if(!hideForm || !surveyViewIsActive()) {
+           return nextFormOID;
+        }
+        previousFormOID = nextFormOID;
+        nextFormOID = null;
+    }
+}
+
 function getNextFormOID(previousFormOID) {
     let formDefs = metadataWrapper.getFormsByStudyEvent(currentPath.studyEventOID);
+    if(formDefs.length && !previousFormOID) return formDefs[0].getOID();
     for (let i = 0; i < formDefs.length-1; i++) {
         if (formDefs[i].getOID() == previousFormOID) return formDefs[i+1].getOID();
     }
 }
 
+function checkPreviousFormOIDIsFirst(nextFormOID) {
+    let formDefs = metadataWrapper.getFormsByStudyEvent(currentPath.studyEventOID);
+
+    let keepSearching = true;
+    let previousFormOID;
+    while(keepSearching) {
+        for (let i = 1; i < formDefs.length; i++) {
+            if (formDefs[i].getOID() == nextFormOID) previousFormOID = formDefs[i-1].getOID();
+        }
+        if(!previousFormOID) {
+            return previousFormOID;
+        }
+        const hideForm = metadataWrapper.getSettingStatusByOID(metadataWrapper.SETTINGS_CONTEXT, 'no-survey', previousFormOID);
+        if(!hideForm || !surveyViewIsActive()) {
+           return previousFormOID;
+        }
+        nextFormOID = previousFormOID;
+        previousFormOID = null;
+    }
+}
+
 function getPreviousFormOID(nextFormOID) {
     let formDefs = metadataWrapper.getFormsByStudyEvent(currentPath.studyEventOID);
-    for (let i = 1; i < formDefs.length; i++) {
+     for (let i = 1; i < formDefs.length; i++) {
         if (formDefs[i].getOID() == nextFormOID) return formDefs[i-1].getOID();
-    }
+    }  
 }
 
 window.validateForm = function() {
@@ -730,6 +942,8 @@ function scrollToFormStart() {
 }
 
 async function saveFormData() {
+    console.log("store", currentPath.formOID);
+    if(!currentPath.studyEventOID || !currentPath.formOID) return;
     const formItemDataList = getFormData();
     const mandatoryFieldsAnswered = checkMandatoryFields(formItemDataList);
 
@@ -744,12 +958,15 @@ async function saveFormData() {
 
     // When mandatory fields were not answered show a warning only once
     if (!skipMandatoryCheck && !mandatoryFieldsAnswered) {
-        ioHelper.showMessage(languageHelper.getTranslation("note"), languageHelper.getTranslation("unanswered-mandatory-questions-warning"));
-        skipMandatoryCheck = true;
-        return false;
-    } else {
-        return true;
+        if(!ioHelper.getSetting('forceMandatoryItems')) {
+            ioHelper.showMessage(languageHelper.getTranslation("note"), languageHelper.getTranslation("unanswered-mandatory-questions-warning"));
+            skipMandatoryCheck = true;
+            return false;
+        }
+        ioHelper.showMessage(languageHelper.getTranslation("note"), languageHelper.getTranslation("unanswered-mandatory-questions-error"));
+        return false;    
     }
+    return true;
 }
 
 function getFormData() {
@@ -803,15 +1020,35 @@ export function cacheFormData() {
 }
 
 // TODO: closeFormData and cancelFormOrSurveyEntry could be further refactored
-window.closeFormData = async function(saveData) {
+window.closeFormData = async function(saveData, recheckAllForms = false) {
     if (saveData) {
         skipMandatoryCheck = true;
         await saveFormData();
         loadSubjectKeys();
     }
 
+    if(recheckAllForms) {
+        currentPath.formOID = null;
+        await saveOnClose();
+    }
+
     if (deferredFunction) await deferredFunction();
     else cancelFormOrSurveyEntry(true);
+}
+
+const saveOnClose = async() => {
+        skipMandatoryCheck = true;
+        if (!await saveFormData()) return;
+
+        let nextFormOID = getNextFormOID(currentPath.formOID);
+        skipDataHasChangedCheck = true;
+        if (nextFormOID) {
+            await loadTree(currentPath.studyEventOID, nextFormOID, currentPath.studyEventRepeatKey);
+            await saveOnClose();
+            return;
+        }
+        
+        //loadSubjectKeys();
 }
 
 window.cancelFormOrSurveyEntry = function(closeSurvey) {
@@ -839,8 +1076,10 @@ window.showSurveyView = function() {
     $("#clinicaldata-column .tree-panel-blocks").classList.add("is-survey-view");
     $("#clinicaldata-section").classList.add("p-3");
     $("#clinicaldata-form-title").classList.add("is-centered");
+    $("#survey-view-button").hide();
     scrollToFormStart();
     document.dispatchEvent(new CustomEvent("SurveyViewShown"));
+    updateFormButtons();
 }
 
 function hideSurveyView() {
@@ -854,6 +1093,18 @@ function hideSurveyView() {
     $("#clinicaldata-column .tree-panel-blocks").classList.remove("is-survey-view");
     $("#clinicaldata-section").classList.remove("p-3");
     $("#clinicaldata-form-title").classList.remove("is-centered");
+    $("#survey-view-button").show();
+    document.dispatchEvent(new CustomEvent("SurveyViewHidden"));
+    updateFormButtons();
+}
+
+function updateFormButtons() {
+    if (!checkNextFormOIDIsLast(currentPath.formOID)) {
+        $("#clinicaldata-next-button").textContent = languageHelper.getTranslation("finish");
+    } else {
+        $("#clinicaldata-next-button").textContent = languageHelper.getTranslation("continue");
+    }
+    $("#clinicaldata-previous-button").disabled = checkPreviousFormOIDIsFirst(currentPath.formOID) ? false : true;
 }
 
 export function safeCloseClinicaldata(callback) {
@@ -999,7 +1250,7 @@ window.showSubjectInfo = function() {
     $$("#audit-records .notification").removeElements();
     for (const auditRecord of clinicaldataWrapper.getAuditRecords()) {
         const auditRecordElement = htmlElements.getAuditRecord(auditRecord);
-        if (auditRecord.formOID) auditRecordElement.querySelector("button").onclick = () => showAuditRecordFormData(auditRecord.studyEventOID, auditRecord.formOID, auditRecord.date);
+        if (auditRecord.formOID) auditRecordElement.querySelector("button").onclick = () => showAuditRecordFormData(auditRecord.studyEventOID, auditRecord.studyEventRepeatKey, auditRecord.formOID, auditRecord.date);
         $("#audit-records").appendChild(auditRecordElement);
     }
 
@@ -1027,12 +1278,12 @@ window.hideSubjectInfo = function() {
     $("#subject-modal").deactivate();
 }
 
-async function showAuditRecordFormData(studyEventOID, formOID, date) {
-    cachedFormData = clinicaldataWrapper.getAuditRecordFormData(studyEventOID, formOID, date);
+async function showAuditRecordFormData(studyEventOID, studyEventRepeatKey, formOID, date) {
+    cachedFormData = clinicaldataWrapper.getAuditRecordFormData(studyEventOID, studyEventRepeatKey, formOID, date);
     if (!cachedFormData) return;
 
     cachedFormDataIsAuditRecord = true;
-    await loadTree(studyEventOID, formOID, currentPath.studyEventRepeatKey);
+    await loadTree(studyEventOID, formOID, studyEventRepeatKey);
 
     hideSubjectInfo();
 }
@@ -1153,4 +1404,8 @@ function filterSubjects(searchString) {
             subject.hide();
         }
     }
+}
+
+function enableInputSection(enable) {
+    $('#clinicaldata-column').querySelectorAll('.input, .button, .select, [type="radio"], [type="select"]').forEach(element => { element.disabled = !enable });
 }

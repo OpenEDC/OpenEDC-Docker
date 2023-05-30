@@ -22,7 +22,7 @@ export function getMetadataPanelBlock(elementOID, elementType, titleText, fallba
     let title = document.createElement("div");
     title.className = "panel-block-title";
 
-    if (titleText) title.textContent = titleText;
+    if (titleText) title.innerHTML = titleText;
     if (!titleText || hasCondition) {
         let dot = document.createElement("span");
         dot.className = "panel-icon has-text-link";
@@ -221,13 +221,14 @@ export function getAuditRecord(auditRecord) {
         <div class="notification">
             <p class="mb-3"><strong>${languageHelper.getTranslation(auditRecord.type)}</strong></p>
             <p>${languageHelper.getTranslation("timestamp")}: <strong>${auditRecord.date.toLocaleString()}</strong></p>
-            ${auditRecord.formOID && auditRecord.studyEventOID ? "<p>" + languageHelper.getTranslation("form") + ": <strong>" + auditRecord.studyEventDescription + ", " + auditRecord.formDescription + "</strong></p>": ""}
-            ${auditRecord.dataStatus ? "<p>" + languageHelper.getTranslation("data-status") + ": <strong>" + languageHelper.getTranslation(auditRecord.dataStatus) + "</strong></p>": ""}
-            ${auditRecord.userOID ? "<p>" + languageHelper.getTranslation("user") + ": <strong>" + auditRecord.userName + "</strong></p>": ""}
-            ${auditRecord.siteOID ? "<p>" + languageHelper.getTranslation("site") + ": <strong>" + auditRecord.siteName + "</strong></p>": ""}
-            ${auditRecord.dataChanges && auditRecord.dataChanges.length ? "<div class='text-divider is-size-7 mt-3 mb-1'>" + languageHelper.getTranslation("changed-data") + "</div>" : ""}
-            ${auditRecord.dataChanges && auditRecord.dataChanges.length ? "<p class='is-size-7'>" + auditRecord.dataChanges.map(item => item.translatedQuestion + " <b>" + item.localizedValue + "</b>").join("<br>") + "</p>" : ""}
-            ${auditRecord.formOID ? "<button class='button is-small mt-4'>" + languageHelper.getTranslation("view-data") + "</button>" : ""}
+            ${auditRecord.studyEventOID ? `<p>${languageHelper.getTranslation("event")}: <strong>${auditRecord.studyEventDescription}</strong>${auditRecord.studyEventRepeatKey ? " (" + auditRecord.studyEventRepeatKey + ". " + languageHelper.getTranslation("repetition") + ")" : ""}</p>`: ""}
+            ${auditRecord.formOID && auditRecord.studyEventOID ? `<p>${languageHelper.getTranslation("form")}: <strong>${auditRecord.formDescription}</strong></p>`: ""}
+            ${auditRecord.dataStatus ? `<p>${languageHelper.getTranslation("data-status")}: <strong>${languageHelper.getTranslation(auditRecord.dataStatus)}</strong></p>`: ""}
+            ${auditRecord.userOID ? `<p>${languageHelper.getTranslation("user")}: <strong>${auditRecord.userName}</strong></p>`: ""}
+            ${auditRecord.siteOID ? `<p>${languageHelper.getTranslation("site")}: <strong>${auditRecord.siteName}</strong></p>`: ""}
+            ${auditRecord.dataChanges && auditRecord.dataChanges.length ? `<div class='text-divider is-size-7 mt-3 mb-1'>${languageHelper.getTranslation("changed-data")}</div>` : ""}
+            ${auditRecord.dataChanges && auditRecord.dataChanges.length ? `<p class='is-size-7'>${auditRecord.dataChanges.map(item => item.translatedQuestion + " <b>" + item.localizedValue + "</b>").join("<br>")}</p>` : ""}
+            ${auditRecord.formOID ? `<button class='button is-small mt-4'>${languageHelper.getTranslation("view-data")}</button>` : ""}
         </div>
     `, "text/html").body.firstChild;
 }

@@ -1,4 +1,4 @@
-const staticCacheName = "static-cache-0.8.1.4";
+const staticCacheName = "static-cache-0.9.2";
 const odmCacheName = "odm-cache";
 const dynamicCacheName = "dynamic-cache";
 const messageQueueName = "message-queue";
@@ -13,7 +13,7 @@ const staticURLs = [
     "/lib/",
     "/plugins/",
     "/favicon.ico",
-    "/manifest.json"
+    "/manifest.json",
 ];
 
 const odmURLs = [
@@ -51,13 +51,14 @@ self.addEventListener("message", (activateEvent) => {
         caches.keys().then(async keys => {
             await Promise.all(keys
                 .filter(key => key != odmCacheName && key != dynamicCacheName && key != messageQueueName)
-                .map(key => caches.delete(key))
+                .map(key => {
+                    return caches.delete(key)
+                })
             )
             activateEvent.source.postMessage("Deleting cache done");
         }) 
     );
 })
-
 
 // Cache and return static and dynamic assets
 self.addEventListener("fetch", fetchEvent => {

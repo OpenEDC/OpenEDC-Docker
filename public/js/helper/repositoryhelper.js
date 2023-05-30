@@ -1,4 +1,6 @@
 import * as app from "../app.js"
+import * as clinicalDataModule from "../clinicaldatamodule.js"
+
 class Repository {
     constructor(id, name, modelParameterName, tokenParameterName, downloadURL) {
         this.id = id;
@@ -101,6 +103,14 @@ export function preloadPage(urlParams){
                     app.enableMode(app.appModes.METADATA);
                     break;
             }
+        }
+    }
+}
+
+export function preloadPatient(urlParams){
+    for (const [parameterName, parameterValue] of urlParams) {
+        if(parameterName === "caseID") {
+            clinicalDataModule.loadOrCreate(parameterValue);
         }
     }
 }

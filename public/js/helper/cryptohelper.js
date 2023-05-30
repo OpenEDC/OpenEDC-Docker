@@ -271,7 +271,6 @@ const shaHashData = async data => {
         "SHA-256",
         dataAsBytes
     );
-
     // Return hash as Base64-encoded string
     return bytesToBase64(new Uint8Array(hash));
 }
@@ -279,7 +278,6 @@ const shaHashData = async data => {
 const pbkdfGenerateAuthenticationKey = async (username, password) => {
     // Authentication key used to make brute-force attacks far more difficult compared to simple password hashing
     const usernameHash = await shaHashData(username);
-
     // Transform inputs to bytes while using part of the username's hash as salt
     const salt = encodeUTF8(usernameHash.slice(0, 32));
     const passwordAsBytes = encodeUTF8(password);

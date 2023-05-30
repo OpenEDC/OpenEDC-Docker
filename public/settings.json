@@ -14,7 +14,54 @@
         "description": "no-survey-description",
         "type": "boolean",
         "scope": [
+            "form", "itemgroup", "item"
+        ]
+    },
+    {
+        "key": "codelistitem-image-width",
+        "i18n": "codelistitem-image-width",
+        "description": "codelistitem-image-width-description",
+        "type": "number",
+        "scope": [
             "itemgroup", "item"
+        ]
+    },
+    {
+        "key": "event-disabled",
+        "i18n": "disable-event",
+        "description": "disable-event-description",
+        "type": "boolean",
+        "scope": [
+            "studyevent"
+        ]
+    },
+    {
+        "key": "date-setting",
+        "i18n": "date-setting",
+        "description": "date-setting-description3",
+        "type": "callback",
+        "callback": "specifyDateSetting",
+        "scope": [
+            "item"
+        ]
+    },
+    {
+        "key": "force-checkboxes",
+        "i18n": "force-checkboxes-name",
+        "description": "force-checkboxes-description-short",
+        "type": "boolean",
+        "scope": [
+            "form", "itemgroup", "item"
+        ]
+    },
+    {
+        "key": "presentation-type",
+        "i18n": "presentation-type",
+        "description": "presentation-type-description",
+        "type": "options",
+        "options": ["default", "next-to-each-other"],
+        "scope": [
+            "item"
         ]
     }
 ]   

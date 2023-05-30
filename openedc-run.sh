@@ -26,7 +26,7 @@ docker_compose_string="-f docker-compose.yml";
 [ -z "${p_in}" ] || docker_compose_string="${docker_compose_string} -f docker-compose.prod.yml";
 
 echo ${docker_compose_string} 
-PORT=${port} NAME=${name} docker-compose ${docker_compose_string} -p openedc-${port} up ${d_in} --remove-orphans
+PORT=${port} NAME=${name} docker-compose ${docker_compose_string} -p openedc-${port} up ${d_in} --build --remove-orphans
 
 [ -z "${o_in}" ] || [ -z "${d_in}" ] ||
 {
