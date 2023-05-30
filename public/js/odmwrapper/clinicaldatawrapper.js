@@ -340,7 +340,7 @@ export async function storeSubject(subjectToStore, subjectDataToStore, disabledE
     subjectToStore.status = await getDataStatus(subjectToStore.uniqueKey, subjectDataToStore); 
     subjectToStore.modifiedDate = modifiedDate;
     clinicaldataFile = new ClinicaldataFile(modifiedDate);
-    await ioHelper.setODM(subjectToStore.fileName, subjectDataToStore, disabledEncryption, ioHelper.hasServerURL() ? previousFileName : undefined);
+    await ioHelper.setODM(subjectToStore.fileName, subjectDataToStore, disabledEncryption, ioHelper.hasServerURL() && previousFileName != subjectToStore.fileName ? previousFileName : undefined);
 
     // This mechanism helps to prevent possible data loss when multiple users edit the same subject data at the same time (especially important for the offline mode)
     // If the previousFileName cannot be removed, the system keeps multiple current versions of the subject data and the user is notified that conflicting data exists
