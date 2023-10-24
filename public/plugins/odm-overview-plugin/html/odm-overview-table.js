@@ -11,6 +11,7 @@ import * as ioHelper from "../../../js/helper/iohelper.js"
 import * as codeCache from "../helper/codeCache.js"
 import * as optionsHelper from "../helper/optionsHelper.js";
 import * as utilHelper from "../helper/utilHelper.js"
+import * as admindataWrapper from "../../../js/odmwrapper/admindatawrapper.js"
 
 const $$ = query => document.querySelectorAll(query);
 let $m;
@@ -478,7 +479,6 @@ async function onDrop(event, ui, copy) {
        } */
 
     //elementTypeOnDrag = null;
-
 }
 
 function adjustSelectContainer() {
@@ -715,6 +715,7 @@ export function updateItem(item, check) {
             break;
     }
     if (!metadataModule.getIsAsyncEditMode()) metadataWrapper.storeMetadata();
+    else ioHelper.dispatchGlobalEvent('MetadataStored');
     metadataModule.reloadTree();
 }
 
@@ -849,7 +850,6 @@ function addUpdateItemListener(identifier, rows = 1) {
         if (jq("#newcont")) {
             jq("#newcont").trigger('blur');
         }
-
         var current = jq(this).text();
         jq(this).html(`<textarea class="form-control textarea" id="newcont" rows="${rows}">${current}</textarea>`);
         jq("#newcont").focus();
@@ -1013,7 +1013,6 @@ function createViewTable(headers, selectedOuterElementOID, categoryType, itemTyp
 
     addTableHeaders(theadDiv, headers);
 
-
     let oidPart = `[OID="${selectedOuterElementOID}"]`
     if(!selectedOuterElementOID) oidPart = '';
     let defs = [];
@@ -1035,7 +1034,6 @@ function createViewTable(headers, selectedOuterElementOID, categoryType, itemTyp
     }
 
     //let headerHeight = 72;//theadDiv.offsetHeight;
-    //console.log(headerHeight);
 
     defs.forEach(def => {
         const defOID = def.getAttribute('OID');
@@ -1224,7 +1222,7 @@ function addCodesToItem(tdCodes, oid) {
     let aliasses = [...$$m(`[OID="${oid}"] Alias`)].filter(a => a.getAttribute('Name') != '');
     let aliasArray = [];
     let previousColor = '';
-    aliasses.forEach(alias => {
+    aliasses.filter(alias => alias.getAttribute('Context') !== metadataWrapper.OPENEDC_SETTINGS_ALIAS_CONTEXT).forEach(alias => {
         let context = alias.getAttribute('Context');
         let formattedContext = utilHelper.formatContext(context);
         if(!Object.keys(contexts).includes(formattedContext)){

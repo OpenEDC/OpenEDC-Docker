@@ -105,7 +105,6 @@ export function ExternalLinksTable(props) {
     }, [links]);
 
     var changeParameter = React.useCallback(function (parameterKey, parentKey, value) {
-        console.log(parameterKey, parentKey, value);
         if (!parameterKey || !parentKey) return;
         var newLinks = [].concat(_toConsumableArray(links));
         var index = newLinks.findIndex(function (link) {
@@ -130,7 +129,6 @@ export function ExternalLinksTable(props) {
             parameters = elements.parameters;
 
         var methodSelectProps = getSingleSelectProps("fa-solid fa-sort-alpha-down", "method", true, ["GET", "POST"], method, ["Get", "Post"], true, key, changeLinkEntry);
-        console.log(parameters);
         //const params = [...elements.parameters]
         return {
             key: key,

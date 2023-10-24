@@ -16,7 +16,7 @@ import { OpenEDCNotification, OpenEDCNotificationAction } from "./helper/notific
 import * as notificationHelper from "./helper/notificationhelper.js";
 import * as htmlElements from "./helper/htmlelements.js"
 
-const appVersion = "0.9.2";
+const appVersion = "0.9.4.1";
 
 export const appModes = {
     METADATA: "metadata",
@@ -731,7 +731,7 @@ window.exportODM = async function() {
     
     if(! await checkDownloadIsAllowed()) return;
 
-    let odm = metadataWrapper.prepareDownload(clinicaldataWrapper.dataStatusTypes);
+    let odm = metadataWrapper.prepareDownload(clinicaldataWrapper.dataStatusTypes, clinicaldataWrapper.annotationTypes);
 
     let admindata = admindataWrapper.getAdmindata(metadataWrapper.getStudyOID());
     if (admindata) odm.querySelector("ODM").appendChild(admindata);
@@ -889,15 +889,12 @@ window.checkForNewVersion = async () => {
 async function attachUpdateListenerToServiceWorker() {
     if(window.navigator.serviceWorker) {
         window.navigator.serviceWorker.addEventListener('message', event => {
-            console.log("service worker reload");
             window.location.reload();
         })
     }
 }
 
 window.updateToNewVersion = async() => {
-    console.log("update");
-    console.log(window.navigator.serviceWorker);
     if(window.navigator.serviceWorker) {
         window.navigator.serviceWorker.ready.then(registration => registration.active.postMessage('Hi there'))
     }

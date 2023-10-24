@@ -15,7 +15,7 @@ class PlotModal extends HTMLElement {
         this.innerHTML = `
         <div class="modal is-active" style="user-select: text;">
             <div class="modal-background"></div>
-            <div class="modal-card">
+            <div class="modal-card is-fit-content">
                 <header class="modal-card-head">
                     <p class="modal-card-title">${this.name}</p>
                     <button class="delete" aria-label="close"></button>
@@ -74,7 +74,13 @@ class PlotModal extends HTMLElement {
             case 'PUT': 
                 let formData = new FormData();
                 finalParameters.forEach((value, key) => {
-                    formData.append(key, value);
+                   if (typeof(value) == "object" && (value instanceof XMLDocument ||value instanceof Element) ) {
+                       let serializer = new XMLSerializer();
+                       formData.append(key, serializer.serializeToString(value));
+                    }
+                    else {
+                       formData.append(key, value);
+                    }
                 });
                 fetch(this.url, {method, body: formData}).then(response => responseCallback(response));
                 break;

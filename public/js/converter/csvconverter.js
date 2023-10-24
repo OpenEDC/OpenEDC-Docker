@@ -10,7 +10,7 @@ export const getCSVString = async () => {
     csvString += itemPaths.map(path => path.toString().replace(/,/g, "")).join(",") + "\n";
 
     // Then, add the subject column as well as the creation date and add the item names as headers to the CSV string
-    csvString += "Subject,RepeatKey,Creation_Date,Creation_Time,";
+    csvString += "Subject,RepeatKey,PatientID,Creation_Date,Creation_Time,";
     csvString += itemPaths.map(path => formatValue(metadataWrapper.getElementDefByOID(path.itemOID).getName())).join(",") + "\n";
 
     // Second, add the creation date and clinical data for each subject
@@ -26,6 +26,7 @@ export const getCSVString = async () => {
         if(highestRepeatKey == 0) {
             csvString += key + ",";
             csvString += "1,";
+            csvString += value["patientID"] + ",";
             csvString += value["createdDate"] + ",";
             csvString += value["createdTime"] + ",";
             csvString += itemPaths.map(path => formatValue(value[path.toString()])).join(",") + "\n";
@@ -34,6 +35,7 @@ export const getCSVString = async () => {
             for (let i = 1; i <= highestRepeatKey; i++) {
                 csvString += key + ",";
                 csvString += i + ",";
+                csvString += (i === 1 ? value["patientID"] : '') + ",";
                 csvString += (i === 1 ? value["createdDate"] : '') + ",";
                 csvString += (i === 1 ? value["createdTime"] :'') + ",";
                 //if repeatkey is 1 the value can either be of a form without repeatkey or with repeatkey === 1, so we have to check for both
@@ -59,7 +61,7 @@ export const getSeparatedCSVFiles = async () => {
         const itemPaths = metadataWrapper.getItemPathsForStudyEvents(studyEvent.getAttribute('OID'));
         let csvString = ",,,,";
         csvString += itemPaths.map(path => path.toString().replace(/,/g, "")).join(",") + "\n";
-        csvString += `Subject,RepeatKey,Creation_Date,Creation_Time,`;
+        csvString += `Subject,RepeatKey,PatientID,Creation_Date,Creation_Time,`;
         csvString += itemPaths.map(path => formatValue(metadataWrapper.getElementDefByOID(path.itemOID).getName())).join(",") + "\n";
 
         for await (let [key, value] of Object.entries(subjectData)) {
@@ -71,6 +73,7 @@ export const getSeparatedCSVFiles = async () => {
             for(let k = 1; k <= repeatableEventsCounts; k++){
                 csvString += key + ",";
                 csvString += k + ",";
+                csvString += (k === 1 ? value["patientID"] : '') + ",";
                 csvString += (k === 1 ? value["createdDate"] : '') + ",";
                 csvString += (k === 1 ? value["createdTime"] :'') + ",";
                 csvString += itemPaths.map(path => formatValue(value[path.toString() + (isRepeating ? `-${k}` : '')])).join(",") + "\n";

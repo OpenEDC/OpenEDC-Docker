@@ -59,14 +59,13 @@ export async function addUmlsSearchOptions() {
     if (alreadyLoaded) return;
     alreadyLoaded = true;
 
-    let aliasDiv = $('#alias-inputs').parentElement;
-    aliasDiv.firstElementChild.classList.add('is-inline-block')
-    let umlsSearchButton = document.createElement("button");
-    umlsSearchButton.innerText = 'Search UMLS Code';
-    umlsSearchButton.className = 'button is-small is-pulled-right is-inline-block is-link is-light';
-    umlsSearchButton.onclick = () => openUMLSSearchWindow(metadataModule.currentPath);
-    aliasDiv.insertBefore(umlsSearchButton, $('#alias-inputs'));
-    /* console.log('addUmlsSearchOptions clicked')
+    let optionsMenuContent = $('#alias-dropdown-menu-content');
+    let umlsSearchOption = document.createElement("a");
+    umlsSearchOption.innerText = 'Search UMLS Code';
+    umlsSearchOption.className = 'dropdown-item';
+    umlsSearchOption.onclick = () => openUMLSSearchWindow(metadataModule.currentPath);
+    optionsMenuContent.appendChild(umlsSearchOption);
+    /*
     let aliasses = $('#alias-inputs');
     aliasses.childNodes.forEach(ad => {
         addUmlsSearchOption(ad);

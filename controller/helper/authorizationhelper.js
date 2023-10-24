@@ -33,9 +33,14 @@ export const authorizationMiddleware = async (context, next, requiredAuthorizati
     let authenticationKey = "";
     const authentication = context.request.headers.get("Authorization");
 
+    let userValid = false;
     if(username) {
         //if query parameters username and password are present, we take it from the parameters
         if(password) authenticationKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(username.toLowerCase(), queryParams.get('password'));
+    } else if(await context.state.session.get('username')) {
+        username = await context.state.session.get('username') || ''
+        authenticationKey = await context.state.session.get('authenticationKey') || ''
+        if(username) userValid = true;
     } else if(authentication) {
         //if a authentication header is pressent, we take the information about username and password from there
         //authentication header is prioritized over parameters
@@ -43,25 +48,28 @@ export const authorizationMiddleware = async (context, next, requiredAuthorizati
         const basicAuthParts = atob(authentication.split(" ")[1]).split(":");
         username = basicAuthParts[0];
         authenticationKey = basicAuthParts[1];
-    } else if(await context.state.session.get('username')) {
-        username = await context.state.session.get('username') || ''
-        authenticationKey = await context.state.session.get('authenticationKey') || ''
-    }
+    } 
 
     if(!username) return noAuthentication(context);
-    let user = users.find(user => user.username && user.username.toLowerCase() == username.toLowerCase());
-    keyAuthentication: if (!user || user.authenticationKey != authenticationKey) {
-        const isPublic = storageHelper.getSetting('instancePublic');
-        if(!isPublic) return badAuthentication(context);
 
-        const secretKey = storageHelper.getSetting('secretKey');
-        if(secretKey && authenticationKey) {
-            const authKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(username.toLowerCase(), secretKey);
-            if(authenticationKey != authKey) return badAuthentication(context);
-            break keyAuthentication;
+    let user = users.find(user => user.username && user.username.toLowerCase() == username.toLowerCase());
+    if(!userValid) {
+         keyAuthentication: if (!user || user.authenticationKey != authenticationKey) {
+            const isPublic = storageHelper.getSetting('instancePublic');
+            if(!isPublic) return badAuthentication(context);
+
+            const secretKey = storageHelper.getSetting('secretKey');
+            if(secretKey && authenticationKey) {
+                const authKey = await cryptoHelper.PBKDF2.generateAuthenticationKey(username.toLowerCase(), secretKey);
+                if(authenticationKey != authKey) return badAuthentication(context);
+                break keyAuthentication;
+            }
+
+            const status = await tryISHLogin(username, queryParams);
+            console.log(status);
+            if(status != ishLoginStatus.SUCCESSFUL) return ishLoginError(context, status);
         }
     }
-
 
     if(!user) user = userController.addUser(username, authenticationKey);
     
@@ -73,6 +81,45 @@ export const authorizationMiddleware = async (context, next, requiredAuthorizati
     }
     await next(context, user);
 };
+
+const tryISHLogin = async (username, queryParams) => {
+    console.log("try ish login")
+    let caseID = queryParams?.get('caseID');
+    let oe = queryParams?.get('oe');
+    let ts = queryParams?.get('ts');
+    let hsh = queryParams?.get('hsh');
+    if(!caseID || !oe || !ts || !hsh) return ishLoginStatus.PARAMETERS_INCOMPLETE;
+    let sec = configHelper.get("ishSecret")
+    const hash = await sha256(`adUser=${username}&caseID=${caseID}&oe=${oe}&ts=${ts}&sec=${sec}`, "utf8", "hex");
+    if(hsh.toLowerCase() != hash.toLowerCase()) return ishLoginStatus.PARAMETERS_INVALID;
+
+    return ishLoginStatus.SUCCESSFUL;
+
+
+
+}
+
+/* const getUsernameAndAuthenticationKey = async (username, password, authentication, context) => {
+    if(username && password) {
+        //if query parameters username and password are present, we take it from the parameters
+        return {username, authenticationKey: await cryptoHelper.PBKDF2.generateAuthenticationKey(username.toLowerCase(), queryParams.get('password'))};
+    }
+
+    if(await context.state.session.get('username')) {
+        username = await context.state.session.get('username') || ''
+        const authenticationKey = await context.state.session.get('authenticationKey') || ''
+        return {username, authenticationKey, userValid: username ? true : false}
+    } 
+    
+    if(authentication) {
+        //if a authentication header is pressent, we take the information about username and password from there
+        //authentication header is prioritized over parameters
+        if (!authentication.split(" ")[0] == "Basic") return malformedAuthenticationHeader(context);
+        const basicAuthParts = atob(authentication.split(" ")[1]).split(":");
+        username = basicAuthParts[0];
+        authenticationKey = basicAuthParts[1];
+    } 
+} */
 
 const malformedAuthenticationHeader = context => {
     context.response.status = 401;

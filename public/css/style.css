@@ -762,12 +762,22 @@ ul.bullet-list {
     z-index: 2;
 }
 
+.is-fit-content {
+    width: auto;
+    height: auto;
+    max-width: calc(100vw - 40px);
+    resize: horizontal;
+}
+
 @media only screen and (max-width: 1024px) {
     #app-mode-button .dropdown-menu {
         top: auto;
         left: 0;
         bottom: 100%;
         padding-bottom: 4px;
+    }
+    .is-fit-content {
+        max-width: 1000px;
     }
 }
 

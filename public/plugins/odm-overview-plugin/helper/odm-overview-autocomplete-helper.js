@@ -172,7 +172,6 @@ const setCurrentPartAndInput = input => {
     removeFilters(type);
 
     if (tokenIndex != currentTokenIndex || input != currentInput || type != currentType) elements = null;
-
     currentType = type;
 }
 

@@ -2,8 +2,7 @@
 import * as storageHelper from "./helper/storagehelper.js";
 import * as statusController from "./statuscontroller.js";
 import * as clinicalDataController from "./clinicaldatacontroller.js"
-import { parse, stringify  } from "../denodependencies/xmlparser.bundle.js";
-import * as cryptoHelper from "./helper/cryptohelper.js"
+import { parse, stringify  } from "https://deno.land/x/xml/mod.ts";
 
 export const exportODMRaw = async (context, user) => {
     const queryParams = await context.request.url.searchParams;
@@ -39,7 +38,7 @@ export const exportODMRaw = async (context, user) => {
     let clinicaldataArray = [];
     clinicaldatafilenames.filter(clinicaldatafilename => {
         const site = clinicalDataController.getSubjectSiteFromFileName(clinicaldatafilename);
-        if(!user.site || site == user.site) return true;
+        if(!site || site == user.site) return true;
         return false;
     }).forEach(clinicaldatafilename => clinicaldataArray.push(storageHelper.loadXML(storageHelper.directories.CLINICALDATA, clinicaldatafilename)));
     if(!encryptionDisbled) {

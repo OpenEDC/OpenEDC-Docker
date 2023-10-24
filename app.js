@@ -12,7 +12,9 @@ storageHelper.init(instance);
 configHelper.init();
 
 const server = new Application();
-const store = new CookieStore(configHelper.get("sessionSecret"))
+const store = new CookieStore(configHelper.get("sessionSecret"),{
+    sessionDataCookieName: `${instance}_data`,
+})
 const port = parseInt(Deno.args[0]);
 
 // Enable CORS
@@ -22,7 +24,11 @@ const corsOptions = {
     allowedHeaders: ["Authorization", "Content-Type"]
   };
 
-server.use(Session.initMiddleware(store));
+server.use(Session.initMiddleware(store,{
+    sessionCookieName: `${instance}_cookie`,
+    cookieSetOptions: {
+    },
+}));
 
 const router = new Router();
 

@@ -10,8 +10,8 @@ class UmlsModal extends HTMLElement {
                     </header>
                     <section class="modal-card-body" style="background-color:white;">
                     <div class="flex-container">
-                        <nav class="panel is-flex-row mr-1 mb-0 is-width-small" id="umls-selected-codes">
-                            <p class="panel-heading has-text-centered has-background-link has-text-light mb-2">Concepts</p>
+                        <nav class="panel is-link is-flex-row mr-1 mb-0 is-width-small" id="umls-selected-codes">
+                            <p class="panel-heading has-text-centered mb-2">Concepts</p>
                             <div class="tree-panel-blocks has-overflow-y has-scrollbar-link p-1" id="umls-codes-content"></div>
                             <div class="panel-block">
                                 <button class="button is-fullwidth is-small is-pulled-right is-link is-light" id="umls-codes-add-concept">Add concept</button>
@@ -19,7 +19,7 @@ class UmlsModal extends HTMLElement {
                         </nav>
                         <div class="box is-flex-row is-flex-grow mb-1">
                             <div>
-                                <label class="label" style="display:inline-block;">Umls search term</label>
+                                <label class="label" style="display:inline-block;">UMLS search term</label>
                                 <div style="float:right;">
                                     <a target="_blank" rel="noopener noreferrer" href="https://uts.nlm.nih.gov/uts/umls/home">UMLS metathesaurus (login required)</a> 
                                     <span> | </span>          
