@@ -29,7 +29,7 @@ class SelectableDiv extends HTMLElement {
             <ul class="column is-12 sortable-umls-group-list has-min-height-20">
             </ul>
         </div>
-        <hr>
+        <hr class="umls-hr">
         `;
 
         this.querySelector('.sortable-umls-group-list').contextName = this.value;

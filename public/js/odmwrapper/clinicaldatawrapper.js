@@ -132,6 +132,10 @@ export const dataStatusTypes = {
     CONFLICT: 5
 };
 
+export const annotationTypes = {
+    PATIENT_ID: 1,
+};
+
 // TODO: Implement anaologously in other helpers?
 // TODO: Could implement other enums with ints as well if there is no string representation needed
 export const errors = {
@@ -237,7 +241,8 @@ export async function loadSubjects() {
     }
 }
 
-export async function addSubject(subjectKey, siteOID) {
+export async function addSubject(subjectKey, siteOID, comment, flagValue) {
+    console.log("add subject", subjectKey, siteOID, comment, flagValue);
     // If no key was provided, return an error
     if (subjectKey.length == 0) return Promise.reject(errors.SUBJECTKEYEMPTY);
 
@@ -254,6 +259,7 @@ export async function addSubject(subjectKey, siteOID) {
 
     const creationDate = new Date();
     subjectData.appendChild(clinicaldataTemplates.getAuditRecord(admindataWrapper.getCurrentUserOID(), siteOID, creationDate.toISOString()));
+    if(comment && flagValue) subjectData.appendChild(clinicaldataTemplates.getComment(comment, 1, metadataWrapper.annotationTypeCodeListOID, flagValue));
 
     subject = new Subject(subjectKey, siteOID, creationDate, null, dataStatusTypes.EMPTY);
     subjects.push(subject);
@@ -496,7 +502,6 @@ export function getFormDataDifference(formItemDataList, studyEventOID, formOID, 
 
 // A filter may contain a studyEventOID, formOID, itemGroupOID, itemOID, userOID, and month
 export function getAuditRecords(filter) {
-    console.log(filter);
     const auditRecords = [];
 
     for (let studyEventData of $$("StudyEventData")) {
@@ -573,10 +578,8 @@ export function getAuditRecords(filter) {
 }
 
 export function getAuditRecordFormData(studyEventOID, studyEventRepeatKey, formOID, date) {
-    console.log(studyEventRepeatKey)
     const formDataElements = [];
     for (const formDataElement of $$(`StudyEventData[StudyEventOID="${studyEventOID}"]${studyEventRepeatKey ? '[StudyEventRepeatKey="' + studyEventRepeatKey + '"]':''} FormData[FormOID="${formOID}"]`)) {
-        console.log(formDataElement);
         const timestamp = formDataElement.querySelector("AuditRecord DateTimeStamp");
         if (timestamp && new Date(timestamp.textContent) <= date) formDataElements.push(formDataElement);
     }
@@ -748,6 +751,15 @@ function formatSubjectData(subjectODMData, options) {
     }
     if (options && options.includeInfo) {
         const createdDate = subjectODMData.querySelector("AuditRecord DateTimeStamp") ? new Date(subjectODMData.querySelector("AuditRecord DateTimeStamp").textContent) : null;
+        const potentialIDs = [...subjectODMData.querySelectorAll("Annotation")].filter(comment => {
+            const flag = comment.querySelector("Flag");
+            if(!flag) return false;
+            const flagValue = flag.querySelector("FlagValue");
+            if(!flagValue) return false;
+            if(flagValue.getAttribute("CodeListOID") == "OpenEDC.Annotations" && flagValue.textContent == annotationTypes.PATIENT_ID) return true;
+            return false;
+        });
+        if(potentialIDs.length > 0) subjectData["patientID"] = potentialIDs[0].querySelector("Comment").textContent;
         subjectData["createdDate"] = createdDate ? createdDate.toLocaleDateString() : null;
         subjectData["createdTime"] = createdDate ? createdDate.toLocaleTimeString() : null;
         subjectData["createdYear"] = createdDate ? createdDate.getFullYear() : null;
@@ -806,6 +818,32 @@ export function checkSubjectsHaveRepeatKey(studyEventOID, subjectsData) {
         if(subjectData.querySelector(`StudyEventData[StudyEventOID="${studyEventOID}"`)?.getAttribute("StudyEventRepeatKey")) return true;
     }
     return false;
+}
+
+export async function addClinicalSubjectDataComment(subjectKey, comment, flagValue) {
+    if (!subjectKey) return;
+    if (!comment) return;
+
+    subject = subjects.find(subject => subject.uniqueKey == subjectKey.toLowerCase());
+    if (subject) subjectData = await loadStoredSubjectData(subject.fileName);
+    else subjectData = null;
+
+    if(!subjectData) return;
+    
+    let seqnum = 1;
+    const annotations = subjectData.querySelectorAll("Annotation");
+    if (annotations.length > 0) {
+        seqnum = parseInt(annotations[annotations.length - 1].getAttribute("SeqNum")) + 1;
+    }
+
+    const annotation = clinicaldataTemplates.getComment(comment, seqnum, metadataWrapper.annotationTypeCodeListOID, flagValue);
+
+    if (subjectData.querySelector("StudyEventData")) {
+        subjectData.insertBefore(annotation, subjectData.querySelector("StudyEventData"));
+    }
+    else {
+        subjectData.appendChild(annotation);
+    }
 }
 
 export function addPendingStudyEventRepeatChange(pendingChange) {

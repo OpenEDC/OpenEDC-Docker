@@ -133,9 +133,9 @@ window.addSubjectBarcode = async function() {
  * @param {string} subjectKey - The subject key.
  * @param {string} siteOID - The site's unique identifier.
  */
-export function addSubject(subjectKey, siteOID) {
+export function addSubject(subjectKey, siteOID, comment, flagValue) {
     // Attempt to add the subject to the system
-    clinicaldataWrapper.addSubject(subjectKey, siteOID)
+    clinicaldataWrapper.addSubject(subjectKey, siteOID, comment, flagValue)
     .then(() => {
         // If the subject was added successfully, reload the subject keys, skip the data has changed check, load the subject data, and dispatch a global event called "SubjectAdded" with the subject key
         loadSubjectKeys();
@@ -439,7 +439,7 @@ export async function reloadTree() {
 // TODO: Loads entire tree if according elements are passed, implement this analogously for metadatamodule
 async function loadTree(studyEventOID, formOID, studyEventRepeatKey) {
     // Check if the data has changed / new data has been entered and show a prompt first
-    if (safeCloseClinicaldata(() => loadTree(studyEventOID, formOID))) return;
+    if (safeCloseClinicaldata(() => loadTree(studyEventOID, formOID, studyEventRepeatKey))) return;
 
     currentPath.studyEventOID = studyEventOID;
     currentPath.formOID = formOID;
@@ -942,7 +942,6 @@ function scrollToFormStart() {
 }
 
 async function saveFormData() {
-    console.log("store", currentPath.formOID);
     if(!currentPath.studyEventOID || !currentPath.formOID) return;
     const formItemDataList = getFormData();
     const mandatoryFieldsAnswered = checkMandatoryFields(formItemDataList);

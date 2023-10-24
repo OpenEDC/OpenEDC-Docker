@@ -96,6 +96,7 @@ export const repeatingTypes = {
 }
 
 export const dataStatusCodeListOID = "OpenEDC.DataStatus";
+export const annotationTypeCodeListOID = "OpenEDC.Annotations";
 
 let metadata = null;
 let metadataFile = null;
@@ -116,6 +117,7 @@ export function importMetadata(odmXMLString) {
 
     // Remove OpenEDC data status code list if present (used to interpret the flag of clinical data entries; will be created on download again)
     if ($(`CodeList[OID="${dataStatusCodeListOID}"]`)) $(`CodeList[OID="${dataStatusCodeListOID}"]`).remove();
+    if ($(`CodeList[OID="${annotationTypeCodeListOID}"]`)) $(`CodeList[OID="${annotationTypeCodeListOID}"]`).remove();
     
     storeMetadata();
 }
@@ -182,7 +184,7 @@ export async function getFormAsHTML(currentPath, currentSubjectKey, textAsTextar
     });
 }
 
-export function prepareDownload(dataStatusTypes) {
+export function prepareDownload(dataStatusTypes, annotationTypes) {
     removeEmptyAliasses();
     let odmCopy = new DOMParser().parseFromString(getSerializedMetadata(), "text/xml");
 
@@ -192,8 +194,12 @@ export function prepareDownload(dataStatusTypes) {
     // Add a code list with all data status types but only when downloading the ODM with clinical data
     if (dataStatusTypes) {
         const dataStatusCodeList = getDataStatusCodeList(dataStatusTypes);
+        const annotationTypeCodeList = getAnnotationTypeCodeList(annotationTypes);
         const insertPosition = odmCopy.querySelectorAll("ItemDef").getLastElement();
-        if (insertPosition) insertPosition.insertAdjacentElement("afterend", dataStatusCodeList);
+        if (insertPosition) {
+            insertPosition.insertAdjacentElement("afterend", dataStatusCodeList);
+            insertPosition.insertAdjacentElement("afterend", annotationTypeCodeList);
+        }
     }
     
     return odmCopy;
@@ -206,16 +212,24 @@ function removeEmptyAliasses() {
 }
 
 export function getDataStatusCodeList(statusTypes) {
-    let dataStatusCodeList = metadataTemplates.getCodeListDef(dataStatusCodeListOID);
+    return getCodeList(statusTypes, dataStatusCodeListOID)
+}
+
+export function getAnnotationTypeCodeList(statusTypes) {
+    return getCodeList(statusTypes, annotationTypeCodeListOID)
+}
+
+export function getCodeList(statusTypes, oid) {
+    let codeList = metadataTemplates.getCodeListDef(oid);
     for (const [key, value] of Object.entries(statusTypes)) {
         let codeListItem = metadataTemplates.getCodeListItem(value);
         let decode = metadataTemplates.getDecode();
         decode.appendChild(metadataTemplates.getTranslatedText(key, "en"));
         codeListItem.appendChild(decode);
-        dataStatusCodeList.appendChild(codeListItem);
+        codeList.appendChild(codeListItem);
     }
 
-    return dataStatusCodeList;
+    return codeList;
 }
 
 export function getStudyName() {
@@ -1060,6 +1074,7 @@ export function copyStudyEvent(studyEventOID, deepCopy) {
             formRef.setAttribute("FormOID", newFormOID);
             replacedOIDs = info.replacedOIDs;
         }
+        copyMethodsAndConditionsForStudyevent(newStudyEventOID, replacedOIDs);
     }
     
     return {newStudyEventOID};
@@ -1086,6 +1101,9 @@ export function copyForm(formOID, deepCopy, studyEventOID, replacedOIDs = {}) {
             itemGroupRef.setAttribute("ItemGroupOID", newItemGroupOID);
             replacedOIDs = info.replacedOIDs;
         }
+        if(studyEventOID) {
+            copyMethodsAndConditionsForForm(newFormOID, replacedOIDs);
+        }
     }
     return {newFormOID, replacedOIDs};
 }
@@ -1109,39 +1127,22 @@ export function copyItemGroup(itemGroupOID, deepCopy, formOID, replacedOIDs = {}
         for (let itemRef of itemRefs) {
             let {newItemOID,...info} = copyItem(itemRef.getAttribute("ItemOID"), true, null, replacedOIDs);
             itemRef.setAttribute("ItemOID", newItemOID);
-            let collectionExceptionConditionOID = itemRef.getAttribute('CollectionExceptionConditionOID');
-            if(collectionExceptionConditionOID){
-                let newConditionDefOID =  copyConditionDef(collectionExceptionConditionOID, replacedOIDs);
-                itemRef.setAttribute('CollectionExceptionConditionOID', newConditionDefOID);
-            }
-            let methodOID = itemRef.getAttribute('MethodOID');
-            if(methodOID){
-                let newMethodOID = copyMethodDef(methodOID, replacedOIDs);
-                itemRef.setAttribute('MethodOID', newMethodOID)
-            }
             replacedOIDs = info.replacedOIDs;
+        }
+        if(formOID) {
+            copyMethodsAndConditionsForItemgroup(newItemGroupOID, replacedOIDs);
         }
     }
     return {newItemGroupOID, replacedOIDs};
 }
 
 export function copyItem(itemOID, deepCopy, itemGroupOID, replacedOIDs = {}) {
-    let newItemOID = generateUniqueOID("I.");
+    let newItemOID = generateUniqueOID("I."); 
 
     if (itemGroupOID) {
         let itemRef = $(`ItemGroupDef[OID="${itemGroupOID}"] ItemRef[ItemOID="${itemOID}"]`);
         itemRef.insertAdjacentElement("afterend", metadataTemplates.getItemRef(newItemOID));
-        let collectionExceptionConditionOID = itemRef.getAttribute('CollectionExceptionConditionOID');
-        if(collectionExceptionConditionOID){
-            let newConditionDefOID = copyConditionDef(collectionExceptionConditionOID, replacedOIDs);
-            $(`ItemGroupDef[OID="${itemGroupOID}"] ItemRef[ItemOID="${newItemOID}"]`).setAttribute('CollectionExceptionConditionOID', newConditionDefOID)
-        }
-
-        let methodOID = itemRef.getAttribute('MethodOID');
-        if(methodOID){
-            let newMethodOID = copyMethodDef(methodOID, replacedOIDs);
-            $(`ItemGroupDef[OID="${itemGroupOID}"] ItemRef[ItemOID="${newItemOID}"]`).setAttribute('MethodOID', newMethodOID)
-        }
+        copyMethodAndConditionForItem(itemRef);
 
         let mandatory = itemRef.getAttribute('Mandatory');
         if(mandatory) {
@@ -1155,7 +1156,7 @@ export function copyItem(itemOID, deepCopy, itemGroupOID, replacedOIDs = {}) {
     itemDef.insertAdjacentElement("afterend", itemDefClone);
 
     if (deepCopy) {
-        replacedOIDs[itemOID]  =newItemOID;
+        replacedOIDs[itemOID] = newItemOID;
         let codeListRef = itemDefClone.querySelector("CodeListRef");
         if (codeListRef) {
             let newCodeListOID = copyCodeList(codeListRef.getAttribute("CodeListOID"));
@@ -1175,6 +1176,49 @@ export function copyCodeList(codeListOID) {
     codeListDef.insertAdjacentElement("afterend", codeListDefClone);
 
     return newCodeListOID;
+}
+
+function copyMethodsAndConditionsForStudyevent(oid, replacedOIDs) {
+
+    let studyEventDef = $(`StudyEventDef[OID="${oid}"]`);
+    let formRefs = studyEventDef.querySelectorAll(`FormRef`);
+    for (let formRef of formRefs) {
+        copyMethodsAndConditionsForForm(formRef.getAttribute('FormOID'), replacedOIDs);
+    }
+
+}
+
+function copyMethodsAndConditionsForForm(oid, replacedOIDs) {
+
+    let formDef = $(`FormDef[OID="${oid}"]`);
+    let itemGroupRefs = formDef.querySelectorAll(`ItemGroupRef`);
+    for (let itemgroupRef of itemGroupRefs) {
+        copyMethodsAndConditionsForItemgroup(itemgroupRef.getAttribute('ItemGroupOID'), replacedOIDs);
+    }
+
+}
+
+function copyMethodsAndConditionsForItemgroup(oid, replacedOIDs) {
+
+    let itemGroupDef = $(`ItemGroupDef[OID="${oid}"]`);
+    let itemRefs = itemGroupDef.querySelectorAll(`ItemRef`);
+    for (let itemRef of itemRefs) {
+        copyMethodAndConditionForItem(itemRef, replacedOIDs);
+    }
+
+}
+
+function copyMethodAndConditionForItem(itemRef, replacedOIDs) {
+    let collectionExceptionConditionOID = itemRef.getAttribute('CollectionExceptionConditionOID');
+    if(collectionExceptionConditionOID){
+        let newConditionDefOID =  copyConditionDef(collectionExceptionConditionOID, replacedOIDs);
+        itemRef.setAttribute('CollectionExceptionConditionOID', newConditionDefOID);
+    }
+    let methodOID = itemRef.getAttribute('MethodOID');
+    if(methodOID){
+        let newMethodOID = copyMethodDef(methodOID, replacedOIDs);
+        itemRef.setAttribute('MethodOID', newMethodOID)
+    }
 }
 
 function copyConditionDef(conditionDefOID, replacedOIDs) {
@@ -1251,12 +1295,12 @@ export async function mergeMetadata(odmXMLString) {
         const odm = new DOMParser().parseFromString(odmXMLString, "text/xml");
         let conditionDefs = odm.querySelectorAll("ConditionDef");
         let methodDefs = odm.querySelectorAll("MethodDef");
-        Object.keys(replaceOIDs).forEach(oldOID => {
+        Object.keys(replaceOIDs).reverse().forEach(oldOID => {
             conditionDefs.forEach(c => {
-                c.querySelector("FormalExpression").textContent = c.querySelector("FormalExpression").textContent.replace(new RegExp(oldOID, "g"), replaceOIDs[oldOID]);
+                c.querySelector("FormalExpression").textContent = c.querySelector("FormalExpression").textContent.replace(new RegExp(`${oldOID}([\\s*\\/+<>^=?:()-]|$)`, "g"), `${replaceOIDs[oldOID]}$1`);
             });
             methodDefs.forEach(m => {
-                m.querySelector("FormalExpression").textContent = m.querySelector("FormalExpression").textContent.replace(new RegExp(oldOID, "g"), replaceOIDs[oldOID]);
+                m.querySelector("FormalExpression").textContent = m.querySelector("FormalExpression").textContent.replace(new RegExp(`${oldOID}([\\s*\\/+<>^=?:()-]|$)`, "g"), `${replaceOIDs[oldOID]}$1`);
             });
         });
 

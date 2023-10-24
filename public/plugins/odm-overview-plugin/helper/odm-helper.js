@@ -20,7 +20,11 @@ export function moveElement(targetElementDef, sourceElementRef, nextSiblingPath,
     if (nextSiblingPath.last.element == elementTypeOnDrag) {
         targetElementDef.insertBefore(sourceElementRef, metadataWrapper.getElementRefByOID(nextSiblingPath.last.element, nextSiblingPath));
     } else {
-        targetElementDef.appendChild(sourceElementRef);
+        const firstAliasElement = targetElementDef.querySelector("Alias");
+        if(firstAliasElement)
+            targetElementDef.insertBefore(sourceElementRef, firstAliasElement);
+        else
+            targetElementDef.appendChild(sourceElementRef);
     }
     if (!metadataModule.getIsAsyncEditMode()) metadataWrapper.storeMetadata();
 }

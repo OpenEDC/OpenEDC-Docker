@@ -1109,7 +1109,6 @@ function setFormSaveTimeout() {
     
     clearFormSaveTimeout();
     formSaveTimer = setTimeout(() => {
-        console.log("speichern!");
         ioHelper.showMessage(languageHelper.getTranslation('save-reminder'), languageHelper.getTranslation('save-reminder-hint'),
             {
                 [languageHelper.getTranslation('save')]: () => executeStoreData(),

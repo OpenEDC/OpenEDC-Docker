@@ -159,6 +159,7 @@ function addGroupedContext(items) {
     contextDiv.appendChild(list);
 
     [...items].forEach(item => {
+
         let listItem = document.createElement('li');
         listItem.codeValue = item;
         listItem.codelistOID = currentCodelistOID;

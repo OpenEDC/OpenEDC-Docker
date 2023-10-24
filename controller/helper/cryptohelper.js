@@ -1,4 +1,5 @@
-import { crypto } from "../../denolibs/cryptoMod.bundle.js";
+//import { crypto } from "https://deno.land/std@0.149.0/crypto/mod.ts";
+import { crypto } from "../../denolibs/crypto.mod.ts";
 
 // Defines the number of PBKDF2 hashing iterations
 const iterationsPBKDF2 = 250000;

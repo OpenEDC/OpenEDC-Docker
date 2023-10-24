@@ -722,7 +722,7 @@ export async function downloadAsZip(filename, contentFiles) {
     
     const zip = new JSZip();
     contentFiles.forEach(({filename, extension, content}) => {
-        zip.file(`${filename}.${extension}`, content);f
+        zip.file(`${filename}.${extension}`, content);
     });
     zip.generateAsync({type: 'blob'}).then(zipFile => {
         saveAs(zipFile, `${filename}.zip`);

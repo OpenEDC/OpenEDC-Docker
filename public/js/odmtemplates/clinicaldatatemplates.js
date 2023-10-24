@@ -51,3 +51,12 @@ export const getFlag = (flagValue, codeListOID) => template(`
         </Flag>
     </Annotation>
 `);
+
+export const getComment = (comment, seqnum, codeListOID, flagValue) => template(`
+    <Annotation SeqNum="${seqnum}">
+        <Comment>${comment}</Comment>
+        <Flag>
+            <FlagValue CodeListOID="${codeListOID}">${flagValue}</FlagValue>
+        </Flag>
+    </Annotation>
+`);
