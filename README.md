@@ -34,7 +34,7 @@ An example would look like this:
 ```
 
 ### SSL
-With the nginx installed by setting the -w flag comes self signed certificate, so the instance is also available under https://localhost/${name}. The reason for this being necessary lies in the requirements of the used web crypto api. By enabling https you are able to deploy the docker image on a vm and make it accessible to other people. Please note that you have to accept the self signed certificate in your browser.
+With the nginx installed by setting the -w flag comes a self signed certificate, so the instance is also available under https://localhost/${name}. The reason for this being necessary lies in the requirements of the used web crypto api. By enabling https you are able to deploy the docker image on a vm and make it accessible to other people. Please note that you have to accept the self signed certificate in your browser.
 You **have to** use the **-w** flag when using the script or *-f docker-compose.nginx.yml* when using the raw command (see below @Executing manually).
 
 ## With Powershell
