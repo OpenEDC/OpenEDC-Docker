@@ -11,6 +11,8 @@ services:
       - web
     volumes:
       - "./nginx-config/templates:/etc/nginx/templates/"
+      - "./nginx-config/data/certs/server.key:/etc/nginx/certs/server.key"
+      - "./nginx-config/data/certs/server.crt:/etc/nginx/certs/server.crt"
     environment:
       - NGINX_INSTANCE_PORT=${PORT}
       - NGINX_INSTANCE_NAME=${NAME}
